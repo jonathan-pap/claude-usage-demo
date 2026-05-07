@@ -52,7 +52,7 @@
   .chapter h2 { font-size: 28px; margin-bottom: 16px; letter-spacing: -0.01em; }
   .chapter .body {
     background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-     margin-top: 8px;
+    margin-top: 8px; padding: 24px 28px;
   }
   .chapter .insight {
     font-size: 18px; line-height: 1.55; margin-bottom: 20px;
@@ -61,11 +61,11 @@
   .chapter .insight em { font-style: normal; color: var(--green); font-weight: 600; }
 
   .stat-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 16px; margin: 20px 0;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 168px));
+    gap: 12px; margin: 20px 0; justify-content: start;
   }
   .stat-grid .item {
-    background: var(--bg); border-radius: 8px; padding: 14px;
+    background: var(--bg); border-radius: 8px; padding: 12px 16px;
     border: 1px solid var(--border);
   }
   .stat-grid .item .v { font-size: 22px; font-weight: 600; }
@@ -130,6 +130,7 @@
       <a href="tour.html" style="color: var(--text);">Story</a>
       <a href="glossary.html">Glossary</a>
       <span style="margin-left:auto; display:inline-flex; gap:8px; align-items:center;">
+        <span style="background:#f59e0b;color:#000;border-radius:100px;padding:2px 10px;font-size:11px;font-weight:700;letter-spacing:.04em;flex-shrink:0;">DEMO</span>
         <span id="themeToggle"></span>
         <span id="settings"></span>
       </span>
@@ -165,6 +166,7 @@
       <div class="body">
         <p class="insight" id="ch2Insight"></p>
         <div class="stat-grid" id="ch2Stats"></div>
+        <div class="verdict info" id="ch2Verdict"></div>
         <p style="margin-top: 16px;"><a href="timeline.html" class="cta">See timestamp-level activity →</a></p>
       </div>
     </div>
@@ -176,6 +178,7 @@
       <div class="body">
         <p class="insight" id="ch3Insight"></p>
         <div class="stat-grid" id="ch3Stats"></div>
+        <div class="verdict info" id="ch3Verdict"></div>
         <p style="margin-top: 16px;"><a href="explore.html#breakdown" class="cta">See full attribution →</a></p>
       </div>
     </div>
@@ -254,17 +257,24 @@ function currentPlan() {
 function pct(v) { return v.toFixed(0) + "%"; }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Helper: format weekday-hour from heatmap
 const WEEKDAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
-function findPeakCell(heatmap) {
-  let best = { wd: 0, hr: 0, cost: 0 };
-  for (let wd = 0; wd < 7; wd++) {
-    for (let hr = 0; hr < 24; hr++) {
-      if (heatmap[wd][hr] > best.cost) best = { wd, hr, cost: heatmap[wd][hr] };
-    }
-  }
-  return best;
+function parseHourlyTrend(hourlyTrend) {
+  const weekdayTotals = Array(7).fill(0);
+  const hourTotals    = Array(24).fill(0);
+  let peakCost = 0, peakWd = 1, peakHr = 10;
+  (hourlyTrend || []).forEach(entry => {
+    const parts = (entry.hour || "").split("T");
+    if (parts.length < 2) return;
+    const dt = new Date(parts[0] + "T00:00:00Z");
+    const wd = (dt.getUTCDay() + 6) % 7;   // 0 = Mon … 6 = Sun
+    const hr = parseInt(parts[1], 10);
+    if (isNaN(wd) || isNaN(hr)) return;
+    weekdayTotals[wd] += entry.cost;
+    hourTotals[hr]    += entry.cost;
+    if (entry.cost > peakCost) { peakCost = entry.cost; peakWd = wd; peakHr = hr; }
+  });
+  return { weekdayTotals, hourTotals, peakWd, peakHr };
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -351,42 +361,52 @@ function render() {
   document.getElementById("ch1Verdict").innerHTML = utilizationVerdict;
 
   // ─── CHAPTER 2: When You Work ─────────────────────────────
-  const heatmap = (i.heatmap && i.heatmap.cost) || [];
-  const peakCell = heatmap.length ? findPeakCell(heatmap) : null;
-  // Total cost per weekday
-  const weekdayTotals = WEEKDAYS.map((_, wd) =>
-    heatmap[wd] ? heatmap[wd].reduce((s, c) => s + c, 0) : 0
-  );
+  const { weekdayTotals, hourTotals, peakWd, peakHr } = parseHourlyTrend(i.hourlyTrend);
   const topWeekday = weekdayTotals.indexOf(Math.max(...weekdayTotals));
-  // Hour-of-day distribution (sum across weekdays)
-  const hourTotals = Array(24).fill(0);
-  heatmap.forEach(row => row.forEach((c, h) => hourTotals[h] += c));
-  const peakHour = hourTotals.indexOf(Math.max(...hourTotals));
-  // Morning (05-12), afternoon (12-18), evening (18-22), night (22-05)
-  const buckets = { morning: 0, afternoon: 0, evening: 0, night: 0 };
+  const peakHour   = hourTotals.indexOf(Math.max(...hourTotals));
+  const buckets    = { morning: 0, afternoon: 0, evening: 0, night: 0 };
   hourTotals.forEach((c, h) => {
-    if (h >= 5 && h < 12)       buckets.morning   += c;
+    if      (h >= 5  && h < 12) buckets.morning   += c;
     else if (h >= 12 && h < 18) buckets.afternoon += c;
     else if (h >= 18 && h < 22) buckets.evening   += c;
     else                         buckets.night     += c;
   });
-  const topBucket = Object.entries(buckets).sort((a, b) => b[1] - a[1])[0];
+  const topBucket    = Object.entries(buckets).sort((a, b) => b[1] - a[1])[0];
+  const hourTotal    = hourTotals.reduce((s, c) => s + c, 0);
 
   document.getElementById("ch2Insight").innerHTML =
     `Your busiest day-of-week is <strong>${WEEKDAYS[topWeekday]}</strong> ` +
     `(${fmtMoney(weekdayTotals[topWeekday])} cumulative), and you cluster most activity around ` +
     `<strong>${Tz.formatHourOfDay(peakHour)} ${Tz.label()}</strong>. ` +
-    `That puts you firmly in the <em>${topBucket[0]}</em> camp — ${pct(topBucket[1] / hourTotals.reduce((s,c)=>s+c,0) * 100)} of your activity.`;
+    `That puts you firmly in the <em>${topBucket[0]}</em> camp — ${pct(topBucket[1] / Math.max(0.001, hourTotal) * 100)} of your activity.`;
 
   const totalTurns = (i.totals && i.totals.turns) || 0;
-  const convCount = (i.conversations || []).length;
+  const convCount  = (i.conversations || []).length;
   document.getElementById("ch2Stats").innerHTML = `
     <div class="item"><div class="v">${WEEKDAYS[topWeekday]}</div><div class="l">Busiest weekday</div></div>
     <div class="item"><div class="v">${Tz.formatHourOfDay(peakHour)}</div><div class="l">Peak hour (${Tz.label()})</div></div>
-    <div class="item"><div class="v">${peakCell ? WEEKDAYS[peakCell.wd] + " " + Tz.formatHourOfDay(peakCell.hr) : "—"}</div><div class="l">Peak slot</div></div>
+    <div class="item"><div class="v">${WEEKDAYS[peakWd]} ${Tz.formatHourOfDay(peakHr)}</div><div class="l">Busiest single slot</div></div>
     <div class="item"><div class="v">${convCount}</div><div class="l">Conversations</div></div>
     <div class="item"><div class="v">${totalTurns.toLocaleString()}</div><div class="l">Total turns</div></div>
   `;
+
+  const isWeekend = peakWd >= 5;
+  const isLateNight = peakHr >= 22 || peakHr < 5;
+  const isEarlyMorning = peakHr >= 5 && peakHr < 7;
+  const ch2V = document.getElementById("ch2Verdict");
+  if (isWeekend) {
+    ch2V.className = "verdict warn";
+    ch2V.innerHTML = `<strong>Weekend-heavy pattern:</strong> your busiest slot lands on a ${WEEKDAYS[peakWd]}. That's fine if intentional, but if you're working weekends by necessity rather than choice, the plan optimizer may reveal cheaper ways to stay within rate limits on weekdays.`;
+  } else if (isLateNight) {
+    ch2V.className = "verdict warn";
+    ch2V.innerHTML = `<strong>Late-night peak at ${Tz.formatHourOfDay(peakHr)}:</strong> heavy late-night usage can push against per-minute rate limits. Consider spreading large tasks across a queue rather than batching them in a single late session.`;
+  } else if (isEarlyMorning) {
+    ch2V.className = "verdict info";
+    ch2V.innerHTML = `<strong>Early-morning starter:</strong> your peak at ${Tz.formatHourOfDay(peakHr)} means you're hitting Claude before the daily rate-limit crowd. Good for throughput — cache reuse also tends to be higher in longer morning sessions.`;
+  } else {
+    ch2V.className = "verdict info";
+    ch2V.innerHTML = `<strong>Healthy pattern:</strong> your activity clusters in standard working hours with <strong>${WEEKDAYS[topWeekday]}</strong> as the biggest day. No unusual pressure on rate limits or weekend burn detected.`;
+  }
 
   // ─── CHAPTER 3: What You're Building ──────────────────────
   const projects = (i.byProject || []).slice(0, 3);
@@ -409,6 +429,21 @@ function render() {
     <div class="item"><div class="v">${(i.byTool || []).length}</div><div class="l">Tools used</div></div>
     <div class="item"><div class="v">${(i.byProject || []).length}</div><div class="l">Projects active</div></div>
   `;
+
+  const ch3V = document.getElementById("ch3Verdict");
+  const topProjectShare = topProject && i.totals.cost > 0 ? topProject.cost / i.totals.cost * 100 : 0;
+  const mcpCount = (i.byMCPServer || []).length;
+  const subagentCount = (i.bySubagent || []).length;
+  if (topProjectShare > 60) {
+    ch3V.className = "verdict warn";
+    ch3V.innerHTML = `<strong>High concentration:</strong> <strong>${U.esc(topProject.name)}</strong> accounts for ${pct(topProjectShare)} of all spend. That's not a problem if it's your main focus — but if other projects are underserved, consider whether context windows are being shared efficiently across sessions.`;
+  } else if (mcpCount >= 5 || subagentCount >= 4) {
+    ch3V.className = "verdict";
+    ch3V.innerHTML = `<strong>Well-tooled workflow:</strong> you're running ${mcpCount} MCP server${mcpCount === 1 ? '' : 's'} and ${subagentCount} subagent type${subagentCount === 1 ? '' : 's'}. That level of automation typically multiplies throughput — check the Explore breakdown to see where those invocations are actually earning their cost.`;
+  } else {
+    ch3V.className = "verdict info";
+    ch3V.innerHTML = `<strong>Balanced portfolio:</strong> spend is spread across <strong>${(i.byProject || []).length} projects</strong> with no single one dominating unhealthily. Top project at ${pct(topProjectShare)} of cost.`;
+  }
 
   // ─── CHAPTER 4: Where the Money Goes ──────────────────────
   const models = i.byModel || [];

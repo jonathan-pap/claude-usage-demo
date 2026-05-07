@@ -18,11 +18,11 @@ random.seed(42)
 
 # ─── Config ────────────────────────────────────────────────────────────────────
 
-START  = datetime(2025, 10,  1, tzinfo=timezone.utc)
-END    = datetime(2026,  3, 31, tzinfo=timezone.utc)
-NOW    = datetime(2026,  4,  1, 9, 0, 0, tzinfo=timezone.utc)
+START  = datetime(2025,  7,  1, tzinfo=timezone.utc)
+END    = datetime(2026,  4, 30, tzinfo=timezone.utc)
+NOW    = datetime(2026,  5,  7, 12, 0, 0, tzinfo=timezone.utc)
 
-TARGET_TOTAL = 1_240.0   # USD over the full period
+TARGET_TOTAL = 2_050.0   # USD over the full period (~10 months)
 MIN_DAY_COST = 1.50      # skip days below this (very quiet weekends)
 
 DAYS = [START + timedelta(days=i) for i in range((END - START).days + 1)]

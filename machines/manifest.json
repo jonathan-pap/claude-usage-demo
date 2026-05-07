@@ -1,29 +1,29 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-04-01T09:00:00Z",
+  "generatedAt": "2026-05-07T12:00:00Z",
   "machineCount": 2,
   "machines": [
     {
       "machine": "demo-laptop",
       "file": "demo-laptop.json",
       "platform": "macos",
-      "lastUpdated": "2026-04-01T09:00:00Z",
-      "totalCost": 930.0002,
-      "totalTokens": 929824311,
-      "daysCovered": 122,
-      "insightsCost": 2604.0006,
-      "insightsTurns": 16856
+      "lastUpdated": "2026-05-07T12:00:00Z",
+      "totalCost": 1537.5003,
+      "totalTokens": 1540445076,
+      "daysCovered": 209,
+      "insightsCost": 4305.0008,
+      "insightsTurns": 27867
     },
     {
       "machine": "demo-desktop",
       "file": "demo-desktop.json",
       "platform": "windows",
-      "lastUpdated": "2026-04-01T09:00:00Z",
-      "totalCost": 310.0001,
-      "totalTokens": 309941437,
-      "daysCovered": 50,
-      "insightsCost": 868.0003,
-      "insightsTurns": 5618
+      "lastUpdated": "2026-05-07T12:00:00Z",
+      "totalCost": 512.5001,
+      "totalTokens": 513481692,
+      "daysCovered": 73,
+      "insightsCost": 1435.0003,
+      "insightsTurns": 9289
     }
   ]
 }
