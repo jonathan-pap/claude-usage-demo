@@ -481,6 +481,7 @@ insights = {
 
 os.makedirs("machines", exist_ok=True)
 manifest_machines = []
+all_machines_data = {}
 
 for mach in MACHINES:
     mname = mach["name"]
@@ -527,6 +528,11 @@ for mach in MACHINES:
         "hourlyTrend": m_hourly,
     }
 
+    all_machines_data[mname] = {
+        "platform": snap["platform"], "lastUpdated": snap["lastUpdated"],
+        "totals": snap["dailyTotals"], "daily": snap["daily"],
+    }
+
     fname = f"machines/{mname}.json"
     with open(fname, "w") as f:
         json.dump(snap, f, separators=(",", ":"))
@@ -547,14 +553,8 @@ with open("machines/manifest.json", "w") as f:
 with open("machines/manifest.js", "w") as f:
     f.write(f"window.MACHINES_MANIFEST = {json.dumps(manifest, separators=(',',':'))};")
 
-all_machines = {m["name"]: {"platform": m["platform"], "lastUpdated": fmt_dt(NOW),
-    "totals": {"inputTokens":int(total_input*m["share"]),"outputTokens":int(total_output*m["share"]),
-               "cacheCreationTokens":int(total_cc*m["share"]),"cacheReadTokens":int(total_cr*m["share"]),
-               "totalTokens":int(total_tokens*m["share"]),"totalCost":round(total_cost*m["share"],4),
-               "cliCost":round(total_cli*m["share"],4),"coworkCost":round(total_cowork*m["share"],4),
-               "cacheHitRatio":overall_cr}} for m in MACHINES}
 with open("machines/all_machines.js", "w") as f:
-    f.write(f"window.ALL_MACHINES = {json.dumps(all_machines, separators=(',',':'))};")
+    f.write(f"window.ALL_MACHINES = {json.dumps(all_machines_data, separators=(',',':'))};");
 
 daily_merged = [{"date": r["date"], "cost": r["totalCost"],
                  "byMachine": {m["name"]: round(r["totalCost"]*m["share"],4) for m in MACHINES}}
