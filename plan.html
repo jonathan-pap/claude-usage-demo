@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Plan — What-If &amp; Tier Explorer</title>
+<link rel="stylesheet" href="themes.css" />
+<script src="util.js"></script>
+<script src="theme.js"></script>
+<script src="currency.js"></script>
+<script src="tzmode.js"></script>
+<script src="plan.js"></script>
+<script src="settings.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>
+  /* Theme tokens come from themes.css; only add layout/utility styles below */
+  :root { --current: var(--accent); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    
+    min-height: 100vh;
+  }
+  h1 { font-size: 24px; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); margin-bottom: 16px; font-size: 14px; }
+  .nav { margin-bottom: 24px; font-size: 13px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .nav a { color: var(--accent); text-decoration: none; margin-right: 0; }
+  .nav a:hover { text-decoration: underline; }
+  .wrap { max-width: 1340px; margin: 0 auto; padding: 24px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 14px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    font-weight: 500;
+  }
+  /* Tab bar */
+  .tab-bar { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .tab-btn { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); font-size: 14px; font-weight: 500; font-family: inherit; padding: 10px 20px; cursor: pointer; margin-bottom: -1px; transition: color 0.15s, border-color 0.15s; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  /* Shared controls */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: flex-end;
+  }
+  .control { display: flex; flex-direction: column; gap: 6px; min-width: 160px; }
+  .control label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .control input[type="number"], .control select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .control input[type="number"]:focus, .control select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .control input[type="range"] { width: 100%; }
+  .slider-wrap { min-width: 280px; }
+  .slider-value { color: var(--accent); font-weight: 600; }
+  .currency-toggle {
+    display: inline-flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .currency-toggle button {
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .currency-toggle button.active {
+    background: var(--accent);
+    color: white;
+  }
+  /* What-If tab styles */
+  .current-banner {
+    background: linear-gradient(135deg, rgba(217, 119, 87, 0.15), rgba(217, 119, 87, 0.05));
+    border: 1px solid rgba(217, 119, 87, 0.4);
+  }
+  .current-banner h2 { color: var(--current); }
+  .current-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 24px;
+    align-items: end;
+  }
+  .stat { }
+  .stat .label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .stat .value { font-size: 22px; font-weight: 600; }
+  .stat .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .pill-current { background: rgba(217, 119, 87, 0.2); color: var(--current); }
+  .pill-cheaper { background: rgba(74, 222, 128, 0.2); color: var(--green); }
+  .pill-pricier { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+  .pill-warn { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
+  .pill-ok { background: rgba(96, 165, 250, 0.15); color: var(--blue); }
+  .row-current { background: rgba(217, 119, 87, 0.06); }
+  .row-best { background: rgba(74, 222, 128, 0.06); }
+  .verdict {
+    background: var(--card);
+    border-left: 3px solid var(--green);
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-top: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .verdict.warn { border-left-color: var(--amber); }
+  .verdict.bad  { border-left-color: var(--red); }
+  /* Tier Explorer tab styles */
+  .grid-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .kpi .label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .kpi .value { font-size: 24px; font-weight: 600; }
+  .kpi .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .grid-charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 900px) { .grid-charts { grid-template-columns: 1fr; } }
+  .tier-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .pill-rack    { background: rgba(239, 68, 68, 0.15);  color: #f87171; }
+  .pill-std     { background: rgba(96, 165, 250, 0.15); color: #60a5fa; }
+  .pill-batch   { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
+  .pill-tier1   { background: rgba(167, 139, 250, 0.15); color: #a78bfa; }
+  .pill-tier2   { background: rgba(244, 114, 182, 0.15); color: #f472b6; }
+  .pill-priority{ background: rgba(217, 119, 87, 0.15); color: #d97757; }
+  .scenario-row { background: rgba(96, 165, 250, 0.04); }
+  .scenario-row td { font-weight: 600; }
+  /* Shared table styles */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .footnote { color: var(--muted); font-size: 11px; margin-top: 8px; }
+  .chart-wrap { position: relative; height: 320px; }
+  .chart-wrap.tall { height: 380px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <a href="index.html" style="font-weight: 600;">← Home</a>
+      <a href="explore.html">Explore</a>
+      <a href="timeline.html">Timeline</a>
+      <a href="projects.html">Projects</a>
+      <a href="improvements.html">Improvements</a>
+      <a href="plan.html" style="color: var(--text);">Plan</a>
+      <a href="tour.html">Story</a>
+      <a href="glossary.html">Glossary</a>
+      <span style="margin-left:auto; display:inline-flex; gap:8px; align-items:center;">
+        <span id="themeToggle"></span><span id="settings"></span>
+      </span>
+    </div>
+    <script>
+      ThemeToggle.mount("themeToggle");
+      Settings.mount("settings");
+    </script>
+
+    <h1>Plan — What-If &amp; Tier Explorer</h1>
+    <p class="subtitle">Plan optimizer and pricing tier explorer, using your real usage data.</p>
+
+    <!-- Shared currency controls card (above tabs) -->
+    <div class="card">
+      <h2>Currency</h2>
+      <div class="controls">
+        <div class="control">
+          <label>Currency</label>
+          <div class="currency-toggle">
+            <button id="curUSD" class="active" onclick="setCurrency('USD')">USD $</button>
+            <button id="curEUR" onclick="setCurrency('EUR')">EUR €</button>
+          </div>
+        </div>
+        <div class="control">
+          <label>USD → EUR rate</label>
+          <input type="number" id="fxRate" value="0.92" step="0.001" min="0.5" max="1.5" oninput="Currency.setRate(this.value)" />
+        </div>
+      </div>
+      <p class="footnote">EUR rate defaults to 0.92 (typical mid-market 2025–2026). Verify against your bank's rate for actual conversion.</p>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="whatif">What-If</button>
+      <button class="tab-btn" data-tab="tiers">Tier Explorer</button>
+    </div>
+
+    <!-- ===================== TAB: WHAT-IF ===================== -->
+    <div id="tab-whatif" class="tab-panel">
+
+      <div class="card current-banner">
+        <h2>Your Current Plan</h2>
+        <div class="current-grid">
+          <div class="stat">
+            <div class="label">Plan</div>
+            <div class="value" id="curPlanName">Max 5× <span class="pill pill-current">Current</span></div>
+          </div>
+          <div class="stat">
+            <div class="label">Monthly fee</div>
+            <div class="value" id="curMonthly">$100.00</div>
+            <div class="sub" id="curAnnual">$1,200 / year</div>
+          </div>
+          <div class="stat">
+            <div class="label">Token-equivalent API value used</div>
+            <div class="value" id="apiEquiv">$47.41 / mo</div>
+            <div class="sub">over 28 days, 9 active</div>
+          </div>
+          <div class="stat">
+            <div class="label">Headroom (paying for)</div>
+            <div class="value" id="headroom" style="color: var(--amber);">$52.59 / mo</div>
+            <div class="sub" id="headroomPct">53% unused capacity</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Adjust Your Expected Usage</h2>
+        <div class="controls">
+          <div class="control slider-wrap">
+            <label>Usage multiplier: <span class="slider-value" id="multLabel">1.0×</span> &nbsp; (<span id="multValue">$47.41/mo</span> API value)</label>
+            <input type="range" id="mult" min="0.1" max="10" step="0.1" value="1.0" oninput="renderWhatIf()" />
+          </div>
+          <div class="control">
+            <label>Quick presets</label>
+            <select id="preset" onchange="applyPreset()">
+              <option value="">— preset —</option>
+              <option value="0.5">Half my usage</option>
+              <option value="1">Current</option>
+              <option value="1.5">+50% growth</option>
+              <option value="2">2× growth</option>
+              <option value="3">3× growth</option>
+              <option value="5">5× growth</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Plan Comparison At Selected Usage</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Plan</th>
+              <th class="num">Monthly</th>
+              <th class="num">Annual</th>
+              <th class="num">Δ vs Current (Max 5×)</th>
+              <th>Fit / Risk</th>
+            </tr>
+          </thead>
+          <tbody id="planBody"></tbody>
+        </table>
+        <div id="verdict"></div>
+      </div>
+
+      <div class="card">
+        <h2>Breakeven Curves — Cost vs Usage</h2>
+        <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+          Each line shows monthly cost as your usage scales. <strong>API</strong> scales linearly; subscriptions are flat. Where lines cross = breakeven.
+          The vertical line marks your current usage.
+        </p>
+        <div class="chart-wrap tall"><canvas id="breakChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h2>Breakeven Points</h2>
+        <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+          How much your usage would have to grow before each plan is justified vs Max 5×.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Plan</th>
+              <th class="num">Breakeven multiplier vs Max 5×</th>
+              <th class="num">Breakeven monthly API value</th>
+              <th>Interpretation</th>
+            </tr>
+          </thead>
+          <tbody id="breakBody"></tbody>
+        </table>
+      </div>
+
+    </div><!-- /tab-whatif -->
+
+    <!-- ===================== TAB: TIER EXPLORER ===================== -->
+    <div id="tab-tiers" class="tab-panel" style="display:none;">
+
+      <div class="card">
+        <h2>Scenario Controls</h2>
+        <div class="controls">
+          <div class="control">
+            <label>Scenario</label>
+            <select id="scenario" onchange="renderTier()">
+              <option value="actual">Your actual usage (so far)</option>
+              <option value="2x">2× your usage</option>
+              <option value="month">Projected to 30 days</option>
+              <option value="custom">Custom volume…</option>
+            </select>
+          </div>
+          <div class="control" id="customVolBox" style="display:none;">
+            <label>Custom multiplier</label>
+            <input type="number" id="customVol" value="1.0" step="0.1" min="0.1" oninput="renderTier()" />
+          </div>
+        </div>
+        <p class="footnote">
+          Token volumes are derived from your real ccusage data (CLI + cowork). Tier rates are applied as a flat % discount on the per-model standard cost.
+        </p>
+      </div>
+
+      <div class="grid-kpis" id="kpis"></div>
+
+      <div class="card">
+        <h2>What If You'd Been On A Different Plan?</h2>
+        <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+          Compares your <strong>actual API spend</strong> against subscription plans, projected to a full month and full year.
+          Uses your usage rate of <strong id="usageRate"></strong>.
+          The <span style="color: var(--green);">cheapest viable</span> option is highlighted; <span style="color: var(--amber);">amber</span> rows likely exceed plan limits for typical Claude Code workloads.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Plan / Billing Mode</th>
+              <th class="num">Cost / month</th>
+              <th class="num">Cost / year</th>
+              <th class="num">vs API Standard (yr)</th>
+              <th>Fit for your workload</th>
+            </tr>
+          </thead>
+          <tbody id="planCompareBody"></tbody>
+        </table>
+        <p class="footnote">
+          <strong>Token volume:</strong> ~25M cache reads + ~3M cache writes + ~250K output per month at current rate. Subscription plans
+          meter by message count and time-windowed limits (e.g. "messages per 5h"), not by tokens — so high-volume Claude Code workloads
+          typically exceed Pro and even Max 5× before reaching the equivalent dollar value. API billing has no such limits.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Pricing Tier Definitions</h2>
+        <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+          Verified against <a href="https://docs.anthropic.com/en/docs/about-claude/pricing" style="color: var(--accent);">Anthropic API docs</a>
+          and <a href="https://claudelog.com/claude-code-pricing/" style="color: var(--accent);">claudelog.com/claude-code-pricing</a>.
+          Anthropic does not publish % volume discounts for the API — Pro/Max are fixed-fee subscriptions, not API tiers.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Tier</th>
+              <th>Discount vs Standard</th>
+              <th>Source / Eligibility</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="tier-pill pill-rack">No Cache</span></td><td class="num">+ ~265%</td><td>Hypothetical: workload re-billed without prompt caching (cache reads at full input price). Shows what caching saves you.</td></tr>
+            <tr><td><span class="tier-pill pill-std">Standard</span></td><td class="num">0%</td><td>Default Anthropic API pricing — what Claude Code is billed at. Includes automatic prompt caching (cache reads at 10% of input).</td></tr>
+            <tr><td><span class="tier-pill pill-priority">Priority Tier</span></td><td class="num">0% (same price)</td><td>Anthropic's committed-throughput tier — same per-token price as Standard; pays for guaranteed capacity, not a discount.</td></tr>
+            <tr><td><span class="tier-pill pill-batch">Batch API</span></td><td class="num">−50%</td><td>Anthropic Batch API — 50% off input + output (and cache types). Async, 24h SLA. Not used by Claude Code (interactive).</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Subscription Plans (Fixed-fee alternatives)</h2>
+        <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+          Pro and Max are fixed monthly fees with bundled usage limits — not per-token API tiers. Compare against your scenario's API spend
+          to see if a subscription would have been cheaper. <strong>Claude Code on a subscription</strong> uses bundled allowance instead of API billing.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Plan</th>
+              <th class="num">Price / month</th>
+              <th class="num" id="planPriceConv"></th>
+              <th>Models</th>
+              <th>Usage</th>
+            </tr>
+          </thead>
+          <tbody id="plansBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Per-Million-Token Rates (Standard, USD)</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th class="num">Input</th>
+              <th class="num">Output</th>
+              <th class="num">Cache Write (5m, 1.25×)</th>
+              <th class="num">Cache Write (1h, 2×)</th>
+              <th class="num">Cache Read (10%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Opus 4.5 / 4.6 / 4.7</strong></td><td class="num">$5.00</td><td class="num">$25.00</td><td class="num">$6.25</td><td class="num">$10.00</td><td class="num">$0.50</td></tr>
+            <tr><td>Opus 4.6 — &gt;200K context</td><td class="num">$10.00</td><td class="num">$37.50</td><td class="num">$12.50</td><td class="num">$20.00</td><td class="num">$1.00</td></tr>
+            <tr><td><strong>Sonnet 4.6</strong></td><td class="num">$3.00</td><td class="num">$15.00</td><td class="num">$3.75</td><td class="num">$6.00</td><td class="num">$0.30</td></tr>
+            <tr><td><strong>Haiku 4.5</strong></td><td class="num">$1.00</td><td class="num">$5.00</td><td class="num">$1.25</td><td class="num">$2.00</td><td class="num">$0.10</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Per-Model Cost by Pricing Tier</h2>
+        <div id="modelTable"></div>
+      </div>
+
+      <div class="grid-charts">
+        <div class="card">
+          <h2>Total Cost by Tier</h2>
+          <div class="chart-wrap"><canvas id="totalTierChart"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Cost by Model &amp; Tier (Stacked)</h2>
+          <div class="chart-wrap"><canvas id="modelTierChart"></canvas></div>
+        </div>
+      </div>
+
+    </div><!-- /tab-tiers -->
+
+  </div><!-- /wrap -->
+
+<script>
+// ============================================================
+// DATA CONSTANTS
+// ============================================================
+
+// What-If optimizer plans (renamed from PLANS to avoid collision)
+const OPTIMIZER_PLANS = [
+  { key: "api",       name: "API Standard (per-token)",   fixed: 0,   variableMul: 1.0,  fit: "ok",      note: "Pay-per-token, no caps. Current Claude Code default." },
+  { key: "apibatch",  name: "API + Batch (50% off)",      fixed: 0,   variableMul: 0.5,  fit: "warn",    note: "Hypothetical — Batch is async-only, not used by Claude Code." },
+  { key: "pro",       name: "Pro ($20/mo)",               fixed: 20,  variableMul: 0,    fit: "exceeds", note: "Limits hit fast on cache-heavy CC use." },
+  { key: "proAnnual", name: "Pro Annual ($16.67/mo)",     fixed: 16.67, variableMul: 0,  fit: "exceeds", note: "$200/yr — same limits as Pro." },
+  { key: "max5",      name: "Max 5× ($100/mo)",           fixed: 100, variableMul: 0,    fit: "current", note: "Your current plan." },
+  { key: "max20",     name: "Max 20× ($200/mo)",          fixed: 200, variableMul: 0,    fit: "ok",      note: "4× the headroom of Max 5×, same model access." },
+  { key: "team",      name: "Team ($30/seat × 5 min)",    fixed: 150, variableMul: 0,    fit: "warn",    note: "Multi-user workspaces only — wasted as a single user." },
+  { key: "enterprise",name: "Enterprise",                 fixed: null,variableMul: 0,    fit: "custom",  note: "Negotiated. Typically only worth it at $1k+/mo committed spend." },
+];
+
+// Pricing tier subscription plans (renamed from PLANS to avoid collision)
+const SUBS = [
+  { name: "Pro",        priceUSD: 20,  models: "Sonnet 4.6 + others",                       usage: "5× free tier limits" },
+  { name: "Pro (annual)", priceUSD: 16.67, models: "Sonnet 4.6 + others",                   usage: "5× free tier; $200/yr saves $40" },
+  { name: "Max 5×",     priceUSD: 100, models: "Sonnet 4.6 + Opus 4.7",                     usage: "5× Pro limits" },
+  { name: "Max 20×",    priceUSD: 200, models: "Sonnet 4.6 + Opus 4.7",                     usage: "20× Pro limits" },
+  { name: "Team",       priceUSD: 30,  models: "Sonnet 4.6 + others (per seat, min 5)",     usage: "Shared workspace; ≥$150/mo" },
+  { name: "Enterprise", priceUSD: 0,   models: "All",                                        usage: "Custom — contact sales" },
+];
+
+const TIERS = [
+  { key: "noCache",  label: "No Cache",  mult: 3.65, pill: "pill-rack" },
+  { key: "standard", label: "Standard",  mult: 1.00, pill: "pill-std" },
+  { key: "priority", label: "Priority",  mult: 1.00, pill: "pill-priority" },
+  { key: "batch",    label: "Batch API", mult: 0.50, pill: "pill-batch" },
+];
+
+const PLAN_COMPARE = [
+  { name: "API Standard (current)",     monthlyUSD: () => USAGE_MONTHLY_USD,        fit: "actual",  note: "What you're paying. No throughput cap." },
+  { name: "API + Batch (50% off)",      monthlyUSD: () => USAGE_MONTHLY_USD * 0.5,  fit: "ok",      note: "Hypothetical — Batch is async only, not used by Claude Code." },
+  { name: "Pro ($20/mo)",               monthlyUSD: () => 20,                       fit: "exceeds", note: "Will hit message limits within hours for heavy CC use." },
+  { name: "Pro Annual ($16.67/mo)",     monthlyUSD: () => 16.67,                    fit: "exceeds", note: "$200/yr — same limits as Pro." },
+  { name: "Max 5× ($100/mo)",           monthlyUSD: () => 100,                      fit: "tight",   note: "May fit moderate CC use; tight at your current volume." },
+  { name: "Max 20× ($200/mo)",          monthlyUSD: () => 200,                      fit: "ok",      note: "Comfortable for heavy CC workloads." },
+  { name: "Team ($30/seat × 5 min)",    monthlyUSD: () => 30 * 5,                   fit: "ok",      note: "Min 5 seats = $150/mo. Only worth it for shared workspaces." },
+  { name: "Enterprise",                 monthlyUSD: () => null,                     fit: "negotiated", note: "Custom pricing — contact Anthropic sales." },
+];
+
+const MODELS = [
+  { name: "opus-4-6",   tokens: 25005850, standardUSD: 24.3980, tokensInput: 3271, tokensOutput: 43524,  tokensCacheW: 1880660, tokensCacheR: 23078895 },
+  { name: "opus-4-7",   tokens: 17669434, standardUSD: 17.9043, tokensInput: 377,  tokensOutput: 187509, tokensCacheW: 778079,  tokensCacheR: 16703469 },
+  { name: "sonnet-4-6", tokens: 3312810,  standardUSD: 1.8870,  tokensInput: 114,  tokensOutput: 20831,  tokensCacheW: 170026,  tokensCacheR: 3121839 },
+  { name: "haiku-4-5",  tokens: 219629,   standardUSD: 0.1255,  tokensInput: 1336, tokensOutput: 5,      tokensCacheW: 88960,   tokensCacheR: 129328 },
+];
+
+// What-If: base API monthly value
+const BASE_API_MONTHLY = 47.41;  // Your actual API-equivalent value: $44.32 over 28 days × 30.44
+
+// Tier Explorer: usage span constants
+const USAGE_SPAN_DAYS = 28;
+const USAGE_TOTAL_USD = 44.32;  // matches usage_history.json totals.totalCost
+const USAGE_DAILY_USD = USAGE_TOTAL_USD / USAGE_SPAN_DAYS;
+const USAGE_MONTHLY_USD = USAGE_DAILY_USD * 30.44;  // avg days/month
+const USAGE_ANNUAL_USD  = USAGE_DAILY_USD * 365;
+
+// ============================================================
+// SHARED HELPERS
+// ============================================================
+
+const fmtMoney = (usd) => (usd === null || usd === undefined) ? "—" : Currency.format(usd);
+function symbol() { return Currency.symbol(); }
+function fxMul()  { return Currency.code() === "EUR" ? Currency.rate() : 1; }
+function setCurrency(c) { Currency.set(c); }
+function syncCurrencyControls() {
+  const c = Currency.code();
+  document.getElementById("curUSD").classList.toggle("active", c === "USD");
+  document.getElementById("curEUR").classList.toggle("active", c === "EUR");
+  const fx = document.getElementById("fxRate");
+  if (fx && parseFloat(fx.value) !== Currency.rate()) fx.value = Currency.rate();
+}
+
+// ============================================================
+// WHAT-IF: Plan key mapping & helpers
+// ============================================================
+
+// Map shared Plan module keys -> local OPTIMIZER_PLANS keys
+const PLAN_KEY_MAP = {
+  api: "api", pro: "pro", pro_annual: "proAnnual",
+  max5: "max5", max20: "max20", team: "team", enterprise: "enterprise",
+};
+function currentKey() {
+  const g = (window.Plan && Plan.current().key) || "max5";
+  return PLAN_KEY_MAP[g] || "max5";
+}
+
+let breakChart;  // What-If breakeven chart instance
+
+function planMonthlyCost(plan, apiUsageMonthly) {
+  if (plan.fixed === null) return null;
+  return plan.fixed + plan.variableMul * apiUsageMonthly;
+}
+
+function fitBadge(fit) {
+  const map = {
+    current: ['Current plan', 'pill-current'],
+    ok:      ['Fits', 'pill-ok'],
+    warn:    ['Caveat', 'pill-warn'],
+    exceeds: ['Exceeds limits', 'pill-pricier'],
+    custom:  ['Custom', 'pill-warn'],
+  };
+  const [label, cls] = map[fit] || [fit, 'pill-ok'];
+  return `<span class="pill ${cls}">${label}</span>`;
+}
+
+function applyPreset() {
+  const v = document.getElementById("preset").value;
+  if (v) {
+    document.getElementById("mult").value = v;
+    renderWhatIf();
+  }
+}
+
+// ============================================================
+// WHAT-IF: Render function
+// ============================================================
+
+function renderWhatIf() {
+  const mult = parseFloat(document.getElementById("mult").value);
+  const apiMonthly = BASE_API_MONTHLY * mult;
+  document.getElementById("multLabel").textContent = mult.toFixed(1) + "×";
+  document.getElementById("multValue").textContent = fmtMoney(apiMonthly) + "/mo";
+
+  const current = OPTIMIZER_PLANS.find(p => p.key === currentKey());
+  const currentCost = planMonthlyCost(current, apiMonthly);
+
+  // Reflect the user's selected plan in the banner heading.
+  const planNameEl = document.getElementById("curPlanName");
+  if (planNameEl) {
+    planNameEl.innerHTML = `${current.name.replace(/\s*\([^)]*\)\s*$/, '')} <span class="pill pill-current">Current</span>`;
+  }
+  document.getElementById("curMonthly").textContent = fmtMoney(currentCost);
+  document.getElementById("curAnnual").textContent = fmtMoney(currentCost * 12) + " / year";
+  document.getElementById("apiEquiv").textContent = fmtMoney(apiMonthly) + " / mo";
+  const headroom = currentCost - apiMonthly;
+  const headroomPct = currentCost > 0 ? (headroom / currentCost * 100) : 0;
+  document.getElementById("headroom").textContent = fmtMoney(headroom);
+  document.getElementById("headroom").style.color = headroom > 0 ? 'var(--amber)' : 'var(--red)';
+  document.getElementById("headroomPct").textContent =
+    headroom > 0 ? headroomPct.toFixed(0) + "% unused capacity" : "Underwater — using more than plan covers";
+
+  // Plan comparison table
+  const computed = OPTIMIZER_PLANS.map(p => ({ ...p, monthly: planMonthlyCost(p, apiMonthly) }));
+  const viable = computed.filter(p => p.monthly !== null && (p.fit === 'ok' || p.fit === 'current' || p.fit === 'warn'));
+  const cheapestViable = viable.reduce((m, p) => (m === null || p.monthly < m.monthly ? p : m), null);
+
+  document.getElementById("planBody").innerHTML = computed.map(p => {
+    const isCurrent = p.key === currentKey();
+    const isBest = p === cheapestViable && !isCurrent;
+    let rowCls = "";
+    if (isCurrent) rowCls = "row-current";
+    else if (isBest) rowCls = "row-best";
+
+    let deltaCell = "—";
+    if (p.monthly !== null && !isCurrent) {
+      const d = p.monthly - currentCost;
+      const sign = d < 0 ? "−" : "+";
+      const color = d < 0 ? "var(--green)" : "var(--red)";
+      deltaCell = `<span style="color:${color}">${sign}${fmtMoney(Math.abs(d))}/mo</span> <span style="color:var(--muted); font-size:11px;">(${sign}${fmtMoney(Math.abs(d) * 12)}/yr)</span>`;
+    }
+    const star = isBest ? ' <span style="color: var(--green); font-size: 11px;">★ best alternative</span>' : '';
+    return `
+      <tr class="${rowCls}">
+        <td><strong>${p.name}</strong>${star}</td>
+        <td class="num">${fmtMoney(p.monthly)}</td>
+        <td class="num">${p.monthly === null ? "—" : fmtMoney(p.monthly * 12)}</td>
+        <td class="num">${deltaCell}</td>
+        <td>${fitBadge(p.fit)} <span style="color: var(--muted); font-size: 11px;">${p.note}</span></td>
+      </tr>
+    `;
+  }).join("");
+
+  // Verdict
+  const apiPlan = computed.find(p => p.key === "api");
+  const max20Plan = computed.find(p => p.key === "max20");
+  const verdictEl = document.getElementById("verdict");
+  let verdictHTML = "";
+  if (apiMonthly < currentCost * 0.6) {
+    const saving = (currentCost - apiMonthly) * 12;
+    verdictHTML = `<div class="verdict warn">⚠ <strong>You're significantly over-paying.</strong> At ${mult.toFixed(1)}× usage you're using only ${(apiMonthly/currentCost*100).toFixed(0)}% of what your $100/mo plan covers. If you don't need the headroom, switching to API billing would save ~${fmtMoney(saving)}/year. <strong>But</strong>: API has no rate limits, so it only saves money if your usage stays predictable.</div>`;
+  } else if (apiMonthly > currentCost * 1.2) {
+    verdictHTML = `<div class="verdict bad">⚠ <strong>You'd exceed Max 5× limits at this volume.</strong> Consider Max 20× ($200/mo, +${fmtMoney(max20Plan.monthly - currentCost)}/mo) or switch to pay-as-you-go API (${fmtMoney(apiMonthly)}/mo, ${fmtMoney(apiMonthly - currentCost)}/mo more).</div>`;
+  } else if (apiMonthly > currentCost * 0.8) {
+    verdictHTML = `<div class="verdict">✓ <strong>Max 5× is well-matched to your usage.</strong> You're using ${(apiMonthly/currentCost*100).toFixed(0)}% of plan equivalent — the small headroom is reasonable insurance against spikes.</div>`;
+  } else {
+    verdictHTML = `<div class="verdict">Max 5× has comfortable headroom for your current usage. Stay if you expect growth or unpredictable spikes; switch to API if usage stays stable.</div>`;
+  }
+  verdictEl.innerHTML = verdictHTML;
+
+  // Breakeven curves chart
+  const xAxis = []; for (let m = 0; m <= 10; m += 0.2) xAxis.push(+m.toFixed(1));
+  const planLines = OPTIMIZER_PLANS.filter(p => p.fixed !== null).map(p => ({
+    label: p.name,
+    data: xAxis.map(x => +(planMonthlyCost(p, BASE_API_MONTHLY * x) * fxMul()).toFixed(2)),
+    borderColor: ({
+      api: '#a78bfa', apibatch: '#c4b5fd', pro: '#60a5fa', proAnnual: '#93c5fd',
+      max5: '#d97757', max20: '#fbbf24', team: '#f472b6'
+    })[p.key],
+    borderWidth: p.key === currentKey() ? 3 : 2,
+    borderDash: p.fit === 'exceeds' || p.fit === 'warn' ? [5, 4] : [],
+    fill: false,
+    tension: 0.1,
+    pointRadius: 0,
+  }));
+
+  if (breakChart) breakChart.destroy();
+  breakChart = new Chart(document.getElementById("breakChart"), {
+    type: 'line',
+    data: { labels: xAxis.map(x => x + '×'), datasets: planLines },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            title: items => `${items[0].label} usage (${fmtMoney(BASE_API_MONTHLY * parseFloat(items[0].label))} API value)`,
+            label: ctx => `${ctx.dataset.label}: ${symbol()}${ctx.parsed.y.toFixed(2)}/mo`,
+          }
+        },
+        annotation: {}
+      },
+      scales: {
+        x: { title: { display: true, text: 'Usage multiplier (vs current)', color: 'var(--muted)' } },
+        y: { beginAtZero: true, ticks: { callback: v => symbol() + v }, title: { display: true, text: 'Monthly cost', color: 'var(--muted)' } }
+      }
+    }
+  });
+
+  // Breakeven points table (vs Max 5×)
+  const breakBody = document.getElementById("breakBody");
+  breakBody.innerHTML = OPTIMIZER_PLANS.filter(p => p.key !== currentKey()).map(p => {
+    if (p.fixed === null) {
+      return `<tr><td><strong>${p.name}</strong></td><td class="num">—</td><td class="num">—</td><td style="color:var(--muted);">Custom pricing — depends on contract.</td></tr>`;
+    }
+    if (p.variableMul === 0) {
+      // Pure fixed plan
+      const delta = p.fixed - 100;
+      const direction = delta < 0 ? "always cheaper" : "always pricier";
+      const color = delta < 0 ? "var(--green)" : "var(--red)";
+      return `<tr><td><strong>${p.name}</strong></td><td class="num">—</td><td class="num">—</td><td><span style="color:${color}">${fmtMoney(Math.abs(delta))}/mo ${direction}</span> than Max 5× regardless of usage. ${p.fit === 'exceeds' ? '<span style="color:var(--amber);">But limits prevent equivalent use.</span>' : ''}</td></tr>`;
+    } else {
+      // Variable plan crosses Max 5× when fixed + var*x*BASE = 100
+      const breakMult = (100 - p.fixed) / (p.variableMul * BASE_API_MONTHLY);
+      const breakValue = BASE_API_MONTHLY * breakMult;
+      const interp = breakMult > 1
+        ? `Switch to Max 5× when usage exceeds <strong>${breakMult.toFixed(2)}×</strong> current. Below that, ${p.name.split(' (')[0]} is cheaper.`
+        : `Already past breakeven — Max 5× is cheaper at your current usage.`;
+      return `<tr><td><strong>${p.name}</strong></td><td class="num">${breakMult.toFixed(2)}×</td><td class="num">${fmtMoney(breakValue)}/mo</td><td>${interp}</td></tr>`;
+    }
+  }).join("");
+}
+
+// ============================================================
+// TIER EXPLORER: chart instances and helpers
+// ============================================================
+
+let charts = {};
+
+function scenarioMultiplier() {
+  const s = document.getElementById("scenario").value;
+  const days = 9; // active days in dataset
+  if (s === "actual") return 1;
+  if (s === "2x")     return 2;
+  if (s === "month")  return 30 / days;
+  if (s === "custom") return parseFloat(document.getElementById("customVol").value) || 1;
+  return 1;
+}
+
+// ============================================================
+// TIER EXPLORER: Render function
+// ============================================================
+
+function renderTier() {
+  document.getElementById("customVolBox").style.display =
+    document.getElementById("scenario").value === "custom" ? "flex" : "none";
+
+  const scen = scenarioMultiplier();
+
+  // Plan comparison: what would each billing mode cost given your usage?
+  const scenForCompare = scen;
+  document.getElementById("usageRate").textContent =
+    fmtMoney(USAGE_MONTHLY_USD * scenForCompare) + " / month (" +
+    fmtMoney(USAGE_ANNUAL_USD * scenForCompare) + " / year)";
+
+  // Find cheapest viable (fit !== "exceeds" and !== "negotiated")
+  const computed = PLAN_COMPARE.map(p => ({
+    ...p,
+    monthly: p.monthlyUSD() === null ? null : p.monthlyUSD() * (p.fit === "actual" ? scenForCompare : 1),
+  }));
+  const viable = computed.filter(p => p.monthly !== null && (p.fit === "ok" || p.fit === "tight" || p.fit === "actual"));
+  const cheapest = viable.reduce((m, p) => (m === null || p.monthly < m.monthly ? p : m), null);
+
+  const tierFitBadge = (fit) => {
+    const map = {
+      actual:     ['Current', 'pill-std'],
+      ok:         ['Fits', 'pill-batch'],
+      tight:      ['Tight fit', 'pill-priority'],
+      exceeds:    ['Exceeds limits', 'pill-rack'],
+      negotiated: ['Custom', 'pill-tier1'],
+    };
+    const [label, cls] = map[fit] || [fit, 'pill-std'];
+    return `<span class="tier-pill ${cls}">${label}</span>`;
+  };
+
+  document.getElementById("planCompareBody").innerHTML = computed.map(p => {
+    const isBest = cheapest && p === cheapest && p.fit !== "actual";
+    const monthlyCell = p.monthly === null ? "—" : fmtMoney(p.monthly);
+    const annualCell = p.monthly === null ? "—" : fmtMoney(p.monthly * 12);
+    const apiAnnual = USAGE_ANNUAL_USD * scenForCompare;
+    let deltaCell = "—";
+    if (p.monthly !== null && p.fit !== "actual") {
+      const delta = p.monthly * 12 - apiAnnual;
+      const sign = delta < 0 ? "−" : "+";
+      const color = delta < 0 ? "var(--green)" : "var(--red)";
+      deltaCell = `<span style="color:${color}">${sign}${fmtMoney(Math.abs(delta))}</span>`;
+    }
+    const rowStyle = isBest ? "background: rgba(74, 222, 128, 0.08);" : "";
+    const nameCell = isBest ? `${p.name} <span style="color: var(--green); font-size: 11px;">★ cheapest viable</span>` : p.name;
+    return `
+      <tr style="${rowStyle}">
+        <td><strong>${nameCell}</strong></td>
+        <td class="num">${monthlyCell}</td>
+        <td class="num">${annualCell}</td>
+        <td class="num">${deltaCell}</td>
+        <td>${tierFitBadge(p.fit)} <span style="color: var(--muted); font-size: 11px;">${p.note}</span></td>
+      </tr>
+    `;
+  }).join("");
+
+  // Subscription plans table
+  document.getElementById("planPriceConv").textContent = Currency.code() === "EUR" ? "Price / month (EUR)" : "";
+  document.getElementById("plansBody").innerHTML = SUBS.map(p => {
+    const usdCell = p.priceUSD > 0 ? "$" + p.priceUSD.toFixed(2) : "—";
+    const eurCell = p.priceUSD > 0 ? "€" + (p.priceUSD * (parseFloat(document.getElementById("fxRate").value) || 0.92)).toFixed(2) : "—";
+    return `
+      <tr>
+        <td><strong>${p.name}</strong></td>
+        <td class="num">${usdCell}</td>
+        <td class="num" style="color: var(--muted);">${Currency.code() === "EUR" ? eurCell : ""}</td>
+        <td>${p.models}</td>
+        <td style="color: var(--muted);">${p.usage}</td>
+      </tr>
+    `;
+  }).join("");
+
+  // KPIs: total at each tier
+  const tierTotals = TIERS.map(t => ({
+    ...t,
+    cost: MODELS.reduce((s, m) => s + m.standardUSD * t.mult, 0) * scen,
+  }));
+  const stdTotal = tierTotals.find(t => t.key === "standard").cost;
+
+  document.getElementById("kpis").innerHTML = tierTotals.map(t => {
+    const delta = t.cost - stdTotal;
+    const deltaStr = t.key === "standard" ? "" :
+      `<div class="sub" style="color:${delta < 0 ? 'var(--green)' : 'var(--red)'}">${delta < 0 ? '−' : '+'}${fmtMoney(Math.abs(delta))} vs Standard</div>`;
+    return `
+      <div class="card kpi" style="margin: 0;">
+        <div class="label"><span class="tier-pill ${t.pill}">${t.label}</span></div>
+        <div class="value">${fmtMoney(t.cost)}</div>
+        ${deltaStr}
+      </div>
+    `;
+  }).join("");
+
+  // Model × Tier table
+  const headers = `
+    <tr>
+      <th>Model</th>
+      <th class="num">Tokens</th>
+      ${TIERS.map(t => `<th class="num"><span class="tier-pill ${t.pill}">${t.label}</span></th>`).join("")}
+    </tr>
+  `;
+  const rows = MODELS.map(m => `
+    <tr>
+      <td><strong>${m.name}</strong></td>
+      <td class="num" style="color:var(--muted);">${(m.tokens * scen / 1e6).toFixed(2)}M</td>
+      ${TIERS.map(t => `<td class="num">${fmtMoney(m.standardUSD * t.mult * scen)}</td>`).join("")}
+    </tr>
+  `).join("");
+  const totalRow = `
+    <tr class="scenario-row">
+      <td>Total</td>
+      <td class="num">${(MODELS.reduce((s,m)=>s+m.tokens,0) * scen / 1e6).toFixed(2)}M</td>
+      ${TIERS.map(t => `<td class="num">${fmtMoney(tierTotals.find(x=>x.key===t.key).cost)}</td>`).join("")}
+    </tr>
+  `;
+  document.getElementById("modelTable").innerHTML = `
+    <table>
+      <thead>${headers}</thead>
+      <tbody>${rows}</tbody>
+      <tfoot>${totalRow}</tfoot>
+    </table>
+  `;
+
+  // Charts
+  const fx = fxMul();
+  if (charts.totalTier) charts.totalTier.destroy();
+  charts.totalTier = new Chart(document.getElementById("totalTierChart"), {
+    type: "bar",
+    data: {
+      labels: TIERS.map(t => t.label),
+      datasets: [{
+        label: `Total (${Currency.code()})`,
+        data: tierTotals.map(t => +(t.cost * fx).toFixed(2)),
+        backgroundColor: ["#ef4444", "#60a5fa", "#d97757", "#4ade80"],
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => symbol() + ctx.parsed.y.toFixed(2) } }
+      },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => symbol() + v } } }
+    }
+  });
+
+  if (charts.modelTier) charts.modelTier.destroy();
+  charts.modelTier = new Chart(document.getElementById("modelTierChart"), {
+    type: "bar",
+    data: {
+      labels: TIERS.map(t => t.label),
+      datasets: MODELS.map((m, i) => ({
+        label: m.name,
+        data: TIERS.map(t => +(m.standardUSD * t.mult * scen * fx).toFixed(2)),
+        backgroundColor: ["#a78bfa", "#d97757", "#60a5fa", "#fbbf24"][i],
+      }))
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom", labels: { font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ": " + symbol() + ctx.parsed.y.toFixed(2) } }
+      },
+      scales: {
+        x: { stacked: true },
+        y: { stacked: true, beginAtZero: true, ticks: { callback: v => symbol() + v } }
+      }
+    }
+  });
+}
+
+// ============================================================
+// EVENT LISTENERS (combined)
+// ============================================================
+
+document.addEventListener("currencychange", () => { syncCurrencyControls(); renderWhatIf(); renderTier(); });
+document.addEventListener("planchange", renderWhatIf);
+document.addEventListener("tzchange",  renderWhatIf);
+
+// Tab switching
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach(p => p.style.display = "none");
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).style.display = "";
+    // re-render active tab so charts resize correctly
+    if (btn.dataset.tab === "whatif") renderWhatIf();
+    else renderTier();
+  });
+});
+
+// ============================================================
+// INITIALISATION
+// ============================================================
+
+Chart.defaults.color = "#8a93a3";
+Chart.defaults.borderColor = "#2a3441";
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+syncCurrencyControls();
+
+// Activate correct tab from hash
+if (location.hash === "#tiers") {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach(p => p.style.display = "none");
+  const tiersBtn = document.querySelector('.tab-btn[data-tab="tiers"]');
+  if (tiersBtn) tiersBtn.classList.add("active");
+  const tiersPanel = document.getElementById("tab-tiers");
+  if (tiersPanel) tiersPanel.style.display = "";
+  renderTier();
+} else {
+  renderWhatIf();
+}
+</script>
+</body>
+</html>

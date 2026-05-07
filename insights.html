@@ -1,0 +1,956 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script>window.location.replace("explore.html#breakdown");</script>
+<title>Insights — Where Your Tokens Go</title>
+<link rel="stylesheet" href="themes.css" />
+<script src="util.js"></script>
+<script src="theme.js"></script>
+<script src="currency.js"></script>
+<script src="tzmode.js"></script>
+<script src="plan.js"></script>
+<script src="settings.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>
+  /* Theme tokens come from themes.css; only add layout/utility styles below */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text); padding: 24px; min-height: 100vh;
+  }
+  h1 { font-size: 24px; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); margin-bottom: 16px; font-size: 14px; }
+  .nav { margin-bottom: 20px; font-size: 13px; }
+  .nav a { color: var(--accent); text-decoration: none; margin-right: 16px; }
+  .nav a:hover { text-decoration: underline; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px; margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 14px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 12px; font-weight: 500;
+  }
+  .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+  .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .kpi .value { font-size: 24px; font-weight: 600; }
+  .kpi .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+  .pill-builtin  { background: rgba(96, 165, 250, 0.18);  color: #60a5fa; }
+  .pill-mcp      { background: rgba(244, 114, 182, 0.18); color: #f472b6; }
+  .pill-plugin   { background: rgba(217, 119, 87, 0.18);  color: #d97757; }
+  .pill-subagent { background: rgba(167, 139, 250, 0.18); color: #a78bfa; }
+  .pill-unknown  { background: rgba(138, 147, 163, 0.18); color: #8a93a3; }
+  .pill-cli      { background: rgba(96, 165, 250, 0.18); color: #60a5fa; }
+  .pill-cowork   { background: rgba(244, 114, 182, 0.18); color: #f472b6; }
+  .chart-wrap { position: relative; height: 320px; }
+  .chart-wrap.tall { height: 400px; }
+  .bar-cell { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+  .bar-cell .bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .bar-cell .bar > div { height: 100%; background: var(--accent); }
+  .footnote { color: var(--muted); font-size: 11px; margin-top: 8px; line-height: 1.4; }
+  details { margin-top: 8px; }
+  details summary { cursor: pointer; color: var(--accent); font-size: 12px; }
+  .roi-positive { color: var(--green); }
+  .roi-warn     { color: var(--amber); }
+
+  /* Page-internal jump nav — sticky under the date filter so it follows
+     while scrolling. Each anchor scrolls smoothly to its section. */
+  .page-nav {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    background: var(--bg-overlay);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    position: sticky; top: 70px; z-index: 40;
+    font-size: 12px;
+  }
+  .page-nav a {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    transition: background 0.1s, color 0.1s;
+  }
+  .page-nav a:hover { color: var(--text); background: var(--card-hi); }
+
+  /* Section anchors need scroll-margin so the sticky nav doesn't cover
+     the headline when the user clicks a jump link. */
+  #summary, #conversations, #trends, #projects, #tools,
+  #mcp-subagents, #roi, #sources { scroll-margin-top: 130px; }
+
+  /* Auto-generated headline insights */
+  .headline { background: linear-gradient(135deg, rgba(217,119,87,0.06), rgba(167,139,250,0.04)); }
+  .headline h2 { color: var(--accent); margin-bottom: 8px; }
+  .headline ul li {
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 14px;
+    color: var(--text);
+  }
+  .headline ul li:last-child { border-bottom: 0; }
+  .headline ul li::before {
+    content: "▸";
+    color: var(--accent);
+    margin-right: 8px;
+    font-size: 11px;
+  }
+  .headline strong { color: var(--accent); }
+  .headline em { color: var(--green); font-style: normal; font-weight: 600; }
+</style>
+</head>
+<body>
+  <h1>Insights — Where Your Tokens Go</h1>
+  <p class="subtitle" id="subtitle">Loading…</p>
+  <div id="machineBanner" style="margin-bottom: 16px;"></div>
+  <script src="machines/manifest.js" onerror="this.remove()"></script>
+  <script>
+    (function () {
+      function paint(m) {
+        if (!m || !m.machines || !m.machines.length) return;
+        const totalInsights = m.machines.reduce((s, x) => s + (x.insightsCost || 0), 0);
+        const list = m.machines.map(x => `<span style="margin-right:14px;">${U.esc(x.machine)} <span style="color:var(--muted);">(${Currency.format(x.insightsCost)} / ${x.insightsTurns||0} turns)</span></span>`).join("");
+        document.getElementById("machineBanner").innerHTML = `
+          <div style="background: rgba(96, 165, 250, 0.08); border: 1px solid rgba(96, 165, 250, 0.3); border-radius: 8px; padding: 12px 16px; font-size: 13px;">
+            <strong style="color: #60a5fa;">Multi-machine sync:</strong>
+            <span style="color: var(--muted);">${m.machineCount} machine(s) — combined ${Currency.format(totalInsights)} attribution.</span>
+            <div style="margin-top: 6px;">${list}</div>
+          </div>
+        `;
+      }
+      if (window.MACHINES_MANIFEST) { paint(window.MACHINES_MANIFEST); return; }
+      fetch("machines/manifest.json").then(r => r.ok ? r.json() : null).then(paint).catch(() => {});
+    })();
+  </script>
+  <div class="nav" style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+    <a href="index.html" style="font-weight: 600;">← Home</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="timeline.html">Timeline</a>
+    <a href="insights.html" style="color: var(--text);">Insights</a>
+    <a href="projects.html">Projects</a>
+    <a href="improvements.html">Improvements</a>
+    <a href="pricing.html">Pricing</a>
+    <a href="whatif.html">What-If</a>
+    <a href="tour.html">Story</a>
+    <a href="glossary.html">Glossary</a>
+    <span style="margin-left:auto; display:inline-flex; gap:8px; align-items:center;">
+      <span id="themeToggle"></span>
+      <span id="settings"></span>
+    </span>
+  </div>
+  <script>
+    ThemeToggle.mount("themeToggle");
+    Settings.mount("settings");
+  </script>
+
+  <div id="dateFilter"></div>
+  <script src="date_filter.js"></script>
+
+  <!-- In-page nav so the page is scannable instead of an endless scroll -->
+  <nav class="page-nav">
+    <a href="#summary">Summary</a>
+    <a href="#conversations">Conversations</a>
+    <a href="#trends">Trends</a>
+    <a href="#projects">Projects</a>
+    <a href="#tools">Tools</a>
+    <a href="#mcp-subagents">MCP &amp; Subagents</a>
+    <a href="#roi">Cache ROI</a>
+    <a href="#sources">Sources</a>
+  </nav>
+
+  <!-- Auto-generated headline insights — three short, plain-English sentences
+       so users get the punchline before any tables -->
+  <div class="card headline" id="summary">
+    <h2>Headline Insights</h2>
+    <ul id="headlineList" style="list-style:none; padding:0; margin:0;"></ul>
+  </div>
+
+  <div class="grid-kpis" id="kpis"></div>
+
+  <div class="card" id="conversations">
+    <h2>Conversations — Context Spend</h2>
+    <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+      Each row is one Claude Code session (sessionId). <strong>Avg context</strong> approximates the running prompt size by summing input + cache_read tokens, divided by turns.
+      Long conversations with low cache hit ratios are usually the ones burning the most context.
+    </p>
+    <div class="grid-kpis" id="convKPIs" style="margin-bottom: 16px;"></div>
+    <table>
+      <thead>
+        <tr>
+          <th>Project / Session</th>
+          <th>Source</th>
+          <th class="num">Turns</th>
+          <th class="num">Total Tokens</th>
+          <th class="num">Avg Context / Turn</th>
+          <th class="num">Cache Hit</th>
+          <th class="num">Duration</th>
+          <th class="num">Cost</th>
+        </tr>
+      </thead>
+      <tbody id="conversationsBody"></tbody>
+    </table>
+    <p class="footnote">
+      Duration is wall-clock time between first and last assistant message. Long durations on few-turn sessions usually mean the session was left open idle.
+    </p>
+  </div>
+
+  <div class="card" id="trends">
+    <h2>Trends Over Time — Where Attribution Is Shifting</h2>
+    <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+      Daily attribution mix. Stacked bars show cost composition per day across each dimension. Hover for exact values.
+    </p>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+      <button class="trend-tab active" data-tab="byProject">By Project</button>
+      <button class="trend-tab" data-tab="byCategory">By Tool Category</button>
+      <button class="trend-tab" data-tab="byMCPServer">By MCP Server</button>
+      <button class="trend-tab" data-tab="byModel">By Model</button>
+      <button class="trend-tab" data-tab="bySource">By Source (CLI/Cowork)</button>
+    </div>
+    <div class="chart-wrap tall"><canvas id="trendChart"></canvas></div>
+    <p class="footnote">Days where you didn't run Claude show as gaps. Earliest data: starts of your usage history; we only see local + cowork from <em>this</em> machine.</p>
+  </div>
+  <style>
+    .trend-tab {
+      background: var(--bg); color: var(--muted); border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 12px; font-size: 12px; font-family: inherit; cursor: pointer;
+    }
+    .trend-tab:hover { color: var(--text); border-color: var(--accent); }
+    .trend-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+  </style>
+
+  <div class="grid-2" id="projects">
+    <div class="card">
+      <h2>Cost by Project</h2>
+      <div class="chart-wrap"><canvas id="projectChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>CLI vs Cowork by Project</h2>
+      <div class="chart-wrap"><canvas id="sourceProjectChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <span>Per-Project Detail</span>
+      <span style="display:inline-flex; gap:8px; align-items:center; font-weight:400; text-transform:none; letter-spacing:0;">
+        <input type="text" id="projectSearch" placeholder="filter by name…"
+               style="background: var(--bg-soft); color: var(--text); border:1px solid var(--border); border-radius:6px; padding:5px 8px; font-size:12px; width:180px;" />
+        <label style="color:var(--muted); font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+          <input type="checkbox" id="projectShowAll" /> show all
+        </label>
+      </span>
+    </h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Project (cwd)</th>
+          <th class="num">Cost</th>
+          <th class="num">CLI / Cowork</th>
+          <th class="num">Tokens</th>
+          <th class="num">Cache Hit</th>
+          <th class="num">Turns</th>
+          <th>Top Tools</th>
+        </tr>
+      </thead>
+      <tbody id="projectsBody"></tbody>
+    </table>
+    <p class="footnote">Cache hit ratio = cache_read / (cache_read + cache_create). Low ratios suggest workflows that fetch fresh data each time — optimization targets. Top 10 by cost shown by default; toggle "show all" to expand.</p>
+  </div>
+
+  <div class="grid-2" id="tools">
+    <div class="card">
+      <h2>Tool Cost Breakdown</h2>
+      <div class="chart-wrap tall"><canvas id="toolChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Cost by Category</h2>
+      <div class="chart-wrap tall"><canvas id="categoryChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <span>All Tools — Approximate Cost Attribution</span>
+      <span style="display:inline-flex; gap:8px; align-items:center; font-weight:400; text-transform:none; letter-spacing:0;">
+        <input type="text" id="toolSearch" placeholder="filter by name…"
+               style="background: var(--bg-soft); color: var(--text); border:1px solid var(--border); border-radius:6px; padding:5px 8px; font-size:12px; width:180px;" />
+        <label style="color:var(--muted); font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+          <input type="checkbox" id="toolShowAll" /> show all
+        </label>
+      </span>
+    </h2>
+    <p style="color: var(--muted); font-size: 12px; margin-bottom: 8px;">
+      Cost per turn is split evenly across tools used in that turn (rough proxy — a turn with 3 tools attributes 1/3 to each). Top 15 by cost shown by default.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Tool</th>
+          <th>Category</th>
+          <th class="num">Invocations</th>
+          <th class="num">Approx Cost</th>
+          <th class="num">Approx Tokens</th>
+          <th>% of Total</th>
+        </tr>
+      </thead>
+      <tbody id="toolsBody"></tbody>
+    </table>
+  </div>
+
+  <div class="grid-2" id="mcp-subagents">
+    <div class="card">
+      <h2>MCP Servers</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Server</th>
+            <th class="num">Calls</th>
+            <th class="num">Approx Cost</th>
+            <th>Top Tools</th>
+          </tr>
+        </thead>
+        <tbody id="mcpBody"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2>Subagents</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Subagent type</th>
+            <th class="num">Invocations</th>
+            <th class="num">Approx Cost</th>
+          </tr>
+        </thead>
+        <tbody id="subagentBody"></tbody>
+      </table>
+      <p class="footnote">Subagents (Agent tool calls with subagent_type) run as separate API conversations. Costs here approximate parent-turn attribution; actual subagent compute appears in the subagent JSONL files and is included in the totals.</p>
+    </div>
+  </div>
+
+  <div class="card" id="roi">
+    <h2>Cache ROI by Model</h2>
+    <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+      What you actually paid (Standard) vs hypothetical cost without prompt caching. Higher % saved = better ROI from cache reuse.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th class="num">Cache Read Tokens</th>
+          <th class="num">Cache Write Tokens</th>
+          <th class="num">Output Tokens</th>
+          <th class="num">Standard Cost</th>
+          <th class="num">No-Cache Cost</th>
+          <th class="num">Saved</th>
+          <th class="num">% Saved</th>
+        </tr>
+      </thead>
+      <tbody id="roiBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card" id="sources">
+    <h2>Source Coverage</h2>
+    <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+      Where your data was found. Multi-machine sync (planned Phase 2) will add per-hostname rows here.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Source</th><th class="num">Cost</th><th class="num">Turns</th><th class="num">Tokens (cache reads)</th><th>Note</th></tr>
+      </thead>
+      <tbody id="sourcesBody"></tbody>
+    </table>
+    <p class="footnote">
+      <strong>Methodology:</strong> Costs computed from raw JSONL using Anthropic published rates (Opus $5/$25, Sonnet $3/$15, Haiku $1/$5 per 1M; cache writes ×1.25, cache reads ×0.10).
+      Totals on this page may exceed <a href="dashboard.html" style="color: var(--accent);">dashboard.html</a> because every assistant turn (including autocompaction summaries and subagent compute) is counted individually here for attribution.
+      All numbers are <strong>API-equivalent value</strong> — you actually pay $100/mo flat under Max 5×.
+    </p>
+  </div>
+
+<script>
+const fmtMoney = v => Currency.format(v);
+const fmtNum   = n => (n || 0).toLocaleString();
+const fmtTok   = n => n >= 1e6 ? (n/1e6).toFixed(2) + "M" : n >= 1e3 ? (n/1e3).toFixed(1) + "K" : (n||0).toString();
+const COLORS   = ["#d97757", "#60a5fa", "#a78bfa", "#4ade80", "#fbbf24", "#f472b6", "#ef4444", "#94a3b8", "#06b6d4", "#84cc16"];
+
+const CAT_COLORS = {
+  builtin:  "#60a5fa",
+  mcp:      "#f472b6",
+  plugin:   "#d97757",
+  subagent: "#a78bfa",
+  unknown:  "#8a93a3",
+};
+
+Chart.defaults.color = "#8a93a3";
+Chart.defaults.borderColor = "#2a3441";
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+// Load via JS shim (works from file://) with fetch fallback for hosted use.
+function loadInsights() {
+  if (window.INSIGHTS) { onLoaded(window.INSIGHTS); return; }
+  const s = document.createElement("script");
+  s.src = "insights_data.js";
+  s.onload = () => {
+    if (window.INSIGHTS) onLoaded(window.INSIGHTS);
+    else fallbackFetch();
+  };
+  s.onerror = fallbackFetch;
+  document.head.appendChild(s);
+}
+function fallbackFetch() {
+  fetch("insights.json").then(r => r.json()).then(d => onLoaded(d)).catch(e => {
+    document.getElementById("subtitle").textContent = "Failed to load insights data — run build_insights.py first.";
+    console.error(e);
+  });
+}
+function onLoaded(d) {
+  RAW = d;
+  // Anchor presets to the latest data point, not real "today"
+  const latestDate = (d.dailyTrend && d.dailyTrend.length) ? d.dailyTrend[d.dailyTrend.length - 1].date : null;
+  DateFilter.mount("dateFilter", {
+    storageKey: "ccusage.insights.range",
+    defaultKey: "all",
+    referenceDate: latestDate,
+    onChange: applyFilter,
+  });
+}
+loadInsights();
+
+document.addEventListener("currencychange", () => {
+  // Re-run with whatever the date filter has stored.
+  const k = localStorage.getItem("ccusage.insights.range") || "all";
+  const refDate = (RAW && RAW.dailyTrend && RAW.dailyTrend.length) ? RAW.dailyTrend[RAW.dailyTrend.length - 1].date : null;
+  const r = DateFilter.rangeFor ? DateFilter.rangeFor(k, refDate) : { startISO: null, endISO: null };
+  applyFilter(k, r.startISO, r.endISO);
+});
+
+let TREND_CHART = null;
+let TREND_DATA = null;
+
+function paintTrend(tab) {
+  if (!TREND_DATA) return;
+  const dim = tab || "byProject";
+  const days = TREND_DATA.map(d => d.date);
+  const seriesMap = new Map();
+  TREND_DATA.forEach(d => {
+    Object.keys(d[dim] || {}).forEach(k => seriesMap.set(k, true));
+  });
+  const allKeys = Array.from(seriesMap.keys());
+  // Sort keys by total descending so largest contributors stack at bottom
+  const totalByKey = {};
+  allKeys.forEach(k => {
+    totalByKey[k] = TREND_DATA.reduce((s, d) => s + ((d[dim] || {})[k] || 0), 0);
+  });
+  allKeys.sort((a, b) => totalByKey[b] - totalByKey[a]);
+  const palette = ["#d97757", "#60a5fa", "#a78bfa", "#4ade80", "#fbbf24", "#f472b6", "#ef4444", "#06b6d4", "#84cc16", "#94a3b8"];
+  const datasets = allKeys.map((k, i) => ({
+    label: k.startsWith("claude-") ? k.replace("claude-", "").replace("-20251001", "") : k,
+    data: TREND_DATA.map(d => +((d[dim] || {})[k] || 0).toFixed(2)),
+    backgroundColor: k === "(Other)" ? "#475569" : palette[i % palette.length],
+    borderRadius: 2,
+  }));
+  if (TREND_CHART) TREND_CHART.destroy();
+  TREND_CHART = new Chart(document.getElementById("trendChart"), {
+    type: "bar",
+    data: { labels: days, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom", labels: { font: { size: 11 } } },
+        tooltip: { mode: "index", intersect: false, callbacks: {
+          label: ctx => `${ctx.dataset.label}: ${Currency.format(ctx.parsed.y)}`,
+          footer: items => `Total: ${Currency.format(items.reduce((s, x) => s + x.parsed.y, 0))}`,
+        }}
+      },
+      scales: {
+        x: { stacked: true },
+        y: { stacked: true, beginAtZero: true, ticks: { callback: v => Currency.format(v) } }
+      }
+    }
+  });
+  document.querySelectorAll(".trend-tab").forEach(btn =>
+    btn.classList.toggle("active", btn.dataset.tab === dim)
+  );
+}
+
+document.querySelectorAll(".trend-tab").forEach(btn => {
+  btn.addEventListener("click", () => paintTrend(btn.dataset.tab));
+});
+
+// Full insights payload (unfiltered). render() rebuilds the page from a filtered slice.
+let RAW = null;
+
+function applyFilter(rangeKey, startISO, endISO) {
+  if (!RAW) return;
+  const filteredTrend = (RAW.dailyTrend || []).filter(d => DateFilter.inRange(d.date, startISO, endISO));
+  TREND_DATA = filteredTrend;
+  const agg = aggregateFromTrend(filteredTrend);
+  // Filter conversations: keep if [earliest, latest] overlaps the selected range
+  const filteredConvs = (RAW.conversations || []).filter(c => {
+    if (!startISO && !endISO) return true;
+    const start = (c.earliest || "").slice(0, 10);
+    const end   = (c.latest   || "").slice(0, 10);
+    if (!start && !end) return false;
+    if (startISO && end && end < startISO) return false;
+    if (endISO   && start && start > endISO) return false;
+    return true;
+  });
+  const useFull = !startISO && !endISO;
+  const payload = useFull
+    ? { ...RAW, dailyTrend: filteredTrend, conversations: filteredConvs }
+    : { ...RAW, ...agg, conversations: filteredConvs, dailyTrend: filteredTrend, _filtered: true, _rangeKey: rangeKey, _startISO: startISO, _endISO: endISO };
+  render(payload);
+}
+
+// Pricing rates (matches build_insights.py — Anthropic published rates)
+const RATES = {
+  opus:   { input: 5.0,  output: 25.0, cache_write: 6.25, cache_read: 0.50 },
+  sonnet: { input: 3.0,  output: 15.0, cache_write: 3.75, cache_read: 0.30 },
+  haiku:  { input: 1.0,  output: 5.0,  cache_write: 1.25, cache_read: 0.10 },
+};
+function modelFamily(name) {
+  const n = (name || "").toLowerCase();
+  if (n.includes("opus"))   return "opus";
+  if (n.includes("sonnet")) return "sonnet";
+  if (n.includes("haiku"))  return "haiku";
+  return "sonnet";
+}
+
+function aggregateFromTrend(trend) {
+  const richSum = (key) => {
+    const out = {};
+    trend.forEach(d => Object.entries(d[key] || {}).forEach(([k, v]) => {
+      const acc = out[k] || (out[k] = { cost:0, input:0, output:0, cacheCreate:0, cacheRead:0, turns:0, cliCost:0, coworkCost:0 });
+      acc.cost        += v.cost || 0;
+      acc.input       += v.input || 0;
+      acc.output      += v.output || 0;
+      acc.cacheCreate += v.cacheCreate || 0;
+      acc.cacheRead   += v.cacheRead || 0;
+      acc.turns       += v.turns || 0;
+      acc.cliCost     += v.cliCost || 0;
+      acc.coworkCost  += v.coworkCost || 0;
+    }));
+    return out;
+  };
+  const sumDim = (key) => {
+    const out = {};
+    trend.forEach(d => Object.entries(d[key] || {}).forEach(([k, v]) => { out[k] = (out[k] || 0) + v; }));
+    return out;
+  };
+
+  const projDetail   = richSum("projectsDetail");
+  const sourceDetail = richSum("sourceDetail");
+  const modelDetail  = richSum("modelDetail");
+  const byToolMap    = sumDim("byTool");
+  const byMCPMap     = sumDim("byMCPServer");
+  const byCategory   = sumDim("byCategory");
+
+  // Totals from rich detail (more reliable than dailyTrend.cost)
+  const totals = trend.reduce((s, d) => ({
+    cost: s.cost + (d.cost || 0),
+    turns: s.turns + (d.turns || 0),
+    input: s.input + (d.input || 0),
+    output: s.output + (d.output || 0),
+    cacheCreate: s.cacheCreate + (d.cacheCreate || 0),
+    cacheRead: s.cacheRead + (d.cacheRead || 0),
+  }), { cost:0, turns:0, input:0, output:0, cacheCreate:0, cacheRead:0 });
+
+  const byProject = Object.entries(projDetail).map(([name, v]) => ({
+    name, cwd: (RAW.byProject || []).find(p => p.name === name)?.cwd || "",
+    cost: +v.cost.toFixed(4),
+    cliCost: +v.cliCost.toFixed(4), coworkCost: +v.coworkCost.toFixed(4),
+    input: v.input, output: v.output, cacheCreate: v.cacheCreate, cacheRead: v.cacheRead,
+    turns: v.turns, models: {}, topTools: [],
+    cacheHitRatio: (v.cacheRead + v.cacheCreate) > 0 ? +(v.cacheRead / (v.cacheRead + v.cacheCreate)).toFixed(4) : 0,
+  })).sort((a, b) => b.cost - a.cost);
+  // Carry top tools from RAW (approximation, not strictly date-filtered)
+  const rawProjLookup = Object.fromEntries((RAW.byProject || []).map(p => [p.name, p]));
+  byProject.forEach(p => {
+    p.topTools = (rawProjLookup[p.name]?.topTools || []).slice(0, 8);
+    p.models = rawProjLookup[p.name]?.models || {};
+  });
+
+  const catLookup = Object.fromEntries((RAW.byTool || []).map(t => [t.name, t.category]));
+  const invLookup = Object.fromEntries((RAW.byTool || []).map(t => [t.name, t.invocations]));
+  const rawCostLookup = Object.fromEntries((RAW.byTool || []).map(t => [t.name, t.approxCost]));
+  const byTool = Object.entries(byToolMap).map(([name, cost]) => ({
+    name, category: catLookup[name] || "unknown", subcategory: "",
+    invocations: rawCostLookup[name] > 0 ? Math.round((invLookup[name] || 0) * (cost / rawCostLookup[name])) : 0,
+    turns: 0, approxCost: +cost.toFixed(4), approxTokens: 0, projects: {},
+  })).sort((a, b) => b.approxCost - a.approxCost);
+
+  const byMCPServer = Object.entries(byMCPMap).map(([server, cost]) => {
+    const raw = (RAW.byMCPServer || []).find(m => m.server === server);
+    const rawCost = raw?.approxCost || 0;
+    return {
+      server, approxCost: +cost.toFixed(4),
+      invocations: rawCost > 0 ? Math.round((raw.invocations || 0) * (cost / rawCost)) : 0,
+      tools: raw?.tools || {}, topTools: raw?.topTools || [],
+    };
+  }).sort((a, b) => b.approxCost - a.approxCost);
+
+  const byModel = Object.entries(modelDetail).map(([model, v]) => {
+    const r = RATES[modelFamily(model)];
+    const noCacheCost = ((v.input + v.cacheRead + v.cacheCreate) * r.input + v.output * r.output) / 1e6;
+    const saved = noCacheCost - v.cost;
+    return {
+      model,
+      cost: +v.cost.toFixed(4),
+      input: v.input, output: v.output, cacheCreate: v.cacheCreate, cacheRead: v.cacheRead,
+      turns: v.turns,
+      noCacheCost: +noCacheCost.toFixed(4),
+      cacheSaved:  +saved.toFixed(4),
+      cacheSavedPct: noCacheCost > 0 ? +(saved / noCacheCost * 100).toFixed(1) : 0,
+    };
+  }).sort((a, b) => b.cost - a.cost);
+
+  const bySource = {
+    cli:    {
+      cost: +(sourceDetail.cli?.cost || 0).toFixed(4), turns: sourceDetail.cli?.turns || 0,
+      input: sourceDetail.cli?.input || 0, output: sourceDetail.cli?.output || 0,
+      cacheCreate: sourceDetail.cli?.cacheCreate || 0, cacheRead: sourceDetail.cli?.cacheRead || 0,
+    },
+    cowork: {
+      cost: +(sourceDetail.cowork?.cost || 0).toFixed(4), turns: sourceDetail.cowork?.turns || 0,
+      input: sourceDetail.cowork?.input || 0, output: sourceDetail.cowork?.output || 0,
+      cacheCreate: sourceDetail.cowork?.cacheCreate || 0, cacheRead: sourceDetail.cowork?.cacheRead || 0,
+    },
+  };
+
+  return { totals, byProject, byTool, byMCPServer, byModel, bySource, byCategory };
+}
+
+function render(d) {
+  // Destroy any existing chart instances (filter re-render)
+  ["projectChart", "sourceProjectChart", "toolChart", "categoryChart"].forEach(id => {
+    const c = Chart.getChart(id);
+    if (c) c.destroy();
+  });
+
+  const total = d.totals;
+  TREND_DATA = d.dailyTrend || TREND_DATA;
+  paintTrend(document.querySelector(".trend-tab.active")?.dataset.tab || "byProject");
+  document.getElementById("subtitle").textContent =
+    `Generated ${d.generatedAt} · ${d.filesScanned} files · ${total.turns.toLocaleString()} turns · ${(total.cacheRead/1e6).toFixed(1)}M cache reads`;
+
+  // ── Headline insights — auto-generated bullets at the top so the
+  // "what should I look at first?" question is answered before any
+  // tables. Findings are picked from extremes: top concentration,
+  // best/worst cache hit, MCP load, source skew, biggest session.
+  const headlineList = document.getElementById("headlineList");
+  if (headlineList) {
+    const lines = [];
+    const totalCost = total.cost || 0;
+    const top = d.byProject[0];
+    if (top && totalCost > 0) {
+      const share = (top.cost / totalCost * 100).toFixed(0);
+      lines.push(`<strong>${U.esc(top.name)}</strong> dominates spend at <em>${share}%</em> (${fmtMoney(top.cost)} of ${fmtMoney(totalCost)}).`);
+    }
+    const worstCache = d.byProject
+      .filter(p => p.turns >= 10 && p.cost > 1)
+      .reduce((m, p) => ((p.cacheHitRatio < (m?.cacheHitRatio ?? 1)) ? p : m), null);
+    if (worstCache && worstCache.cacheHitRatio < 0.7) {
+      lines.push(`Lowest cache hit on <strong>${U.esc(worstCache.name)}</strong> at <em>${(worstCache.cacheHitRatio * 100).toFixed(0)}%</em> — likely re-reading context every turn.`);
+    }
+    const bestCache = d.byProject
+      .filter(p => p.turns >= 10)
+      .reduce((m, p) => ((p.cacheHitRatio > (m?.cacheHitRatio ?? 0)) ? p : m), null);
+    if (bestCache) {
+      lines.push(`Best cache reuse: <strong>${U.esc(bestCache.name)}</strong> at <em>${(bestCache.cacheHitRatio * 100).toFixed(0)}%</em>.`);
+    }
+    const topMCP = d.byMCPServer[0];
+    if (topMCP && topMCP.invocations > 50) {
+      lines.push(`Heaviest MCP server: <strong>${U.esc(topMCP.server)}</strong> with <em>${topMCP.invocations.toLocaleString()}</em> calls (${fmtMoney(topMCP.approxCost)}).`);
+    }
+    const cliPct = totalCost > 0 ? (d.bySource.cli.cost / totalCost * 100) : 0;
+    if (cliPct >= 80 || cliPct <= 20) {
+      const dominant = cliPct >= 80 ? "CLI" : "Cowork";
+      const pct = cliPct >= 80 ? cliPct : (100 - cliPct);
+      lines.push(`Source skew: <strong>${dominant}</strong> drives <em>${pct.toFixed(0)}%</em> of cost on this machine.`);
+    }
+    const totalConvs = (d.conversations || []).length;
+    const longest = (d.conversations || []).reduce((m, c) => ((c.turns || 0) > (m?.turns || 0) ? c : m), null);
+    if (longest && longest.turns >= 200) {
+      lines.push(`Longest session: <strong>${U.esc(longest.name || "—")}</strong> ran <em>${longest.turns.toLocaleString()}</em> turns (${fmtMoney(longest.cost)}, across ${totalConvs} sessions total).`);
+    }
+    headlineList.innerHTML = lines.length
+      ? lines.map(l => `<li>${l}</li>`).join("")
+      : `<li style="color: var(--muted);">No data yet. Run <code>bash update_usage.sh</code> to populate.</li>`;
+  }
+
+  // KPIs
+  document.getElementById("kpis").innerHTML = `
+    <div class="card kpi" style="margin:0;">
+      <div class="label">Total API-Equivalent Cost</div>
+      <div class="value">${fmtMoney(total.cost)}</div>
+      <div class="sub">${total.turns.toLocaleString()} assistant turns</div>
+    </div>
+    <div class="card kpi" style="margin:0;">
+      <div class="label">Top Project</div>
+      <div class="value">${d.byProject[0].name}</div>
+      <div class="sub">${fmtMoney(d.byProject[0].cost)} (${(d.byProject[0].cost/total.cost*100).toFixed(0)}% of spend)</div>
+    </div>
+    <div class="card kpi" style="margin:0;">
+      <div class="label">Top Tool by Cost</div>
+      <div class="value">${d.byTool[0].name.length > 25 ? d.byTool[0].name.slice(0, 22) + '…' : d.byTool[0].name}</div>
+      <div class="sub">${d.byTool[0].invocations} calls · ${fmtMoney(d.byTool[0].approxCost)}</div>
+    </div>
+    <div class="card kpi" style="margin:0;">
+      <div class="label">Top MCP Server</div>
+      <div class="value">${d.byMCPServer[0]?.server || "—"}</div>
+      <div class="sub">${d.byMCPServer[0] ? d.byMCPServer[0].invocations + ' calls · ' + fmtMoney(d.byMCPServer[0].approxCost) : ''}</div>
+    </div>
+    <div class="card kpi" style="margin:0;">
+      <div class="label">CLI vs Cowork</div>
+      <div class="value">${(d.bySource.cli.cost / total.cost * 100).toFixed(0)}% / ${(d.bySource.cowork.cost / total.cost * 100).toFixed(0)}%</div>
+      <div class="sub">${fmtMoney(d.bySource.cli.cost)} CLI · ${fmtMoney(d.bySource.cowork.cost)} Cowork</div>
+    </div>
+    <div class="card kpi" style="margin:0;">
+      <div class="label">Cache Hit Ratio (overall)</div>
+      <div class="value" style="color: var(--green);">${(total.cacheRead / (total.cacheRead + total.cacheCreate) * 100).toFixed(1)}%</div>
+      <div class="sub">${fmtTok(total.cacheRead)} reads / ${fmtTok(total.cacheCreate)} writes</div>
+    </div>
+  `;
+
+  // Project chart
+  const topProjects = d.byProject.slice(0, 8);
+  new Chart(document.getElementById("projectChart"), {
+    type: "bar",
+    data: {
+      labels: topProjects.map(p => p.name),
+      datasets: [{ data: topProjects.map(p => +p.cost.toFixed(2)), backgroundColor: COLORS, borderRadius: 4 }],
+    },
+    options: {
+      indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtMoney(ctx.parsed.x) } } },
+      scales: { x: { beginAtZero: true, ticks: { callback: v => Currency.format(v) } } }
+    }
+  });
+
+  // Source x project (stacked)
+  new Chart(document.getElementById("sourceProjectChart"), {
+    type: "bar",
+    data: {
+      labels: topProjects.map(p => p.name),
+      datasets: [
+        { label: "CLI",    data: topProjects.map(p => +p.cliCost.toFixed(2)),    backgroundColor: "#60a5fa" },
+        { label: "Cowork", data: topProjects.map(p => +p.coworkCost.toFixed(2)), backgroundColor: "#f472b6" },
+      ]
+    },
+    options: {
+      indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { font: { size: 11 } } } },
+      scales: { x: { stacked: true, beginAtZero: true, ticks: { callback: v => Currency.format(v) } }, y: { stacked: true } }
+    }
+  });
+
+  // Project table — top-10 by default, all on toggle, with name search.
+  function renderProjects() {
+    const search = (document.getElementById("projectSearch")?.value || "").toLowerCase().trim();
+    const showAll = document.getElementById("projectShowAll")?.checked;
+    let rows = d.byProject;
+    if (search) rows = rows.filter(p => (p.name || "").toLowerCase().includes(search));
+    const truncated = !showAll && rows.length > 10;
+    if (truncated) rows = rows.slice(0, 10);
+    document.getElementById("projectsBody").innerHTML = rows.map(p => {
+      const tools = (p.topTools || []).slice(0, 4).map(t => {
+        const short = t.name.length > 28 ? t.name.slice(0, 25) + "…" : t.name;
+        return `<span style="color: var(--muted); font-size: 11px; margin-right: 8px;">${U.esc(short)} (${t.count})</span>`;
+      }).join("");
+      const cwd = p.cwd ? `<div style="color: var(--muted); font-size: 11px;">${U.esc(p.cwd)}</div>` : "";
+      const hitColor = p.cacheHitRatio > 0.85 ? "var(--green)" : p.cacheHitRatio > 0.5 ? "var(--amber)" : "var(--red)";
+      return `<tr>
+        <td><strong>${U.esc(p.name)}</strong>${cwd}</td>
+        <td class="num">${fmtMoney(p.cost)}</td>
+        <td class="num"><span class="pill pill-cli">${fmtMoney(p.cliCost)}</span> / <span class="pill pill-cowork">${fmtMoney(p.coworkCost)}</span></td>
+        <td class="num">${fmtTok(p.input + p.output + p.cacheCreate + p.cacheRead)}</td>
+        <td class="num" style="color:${hitColor};">${(p.cacheHitRatio * 100).toFixed(0)}%</td>
+        <td class="num">${p.turns}</td>
+        <td>${tools}</td>
+      </tr>`;
+    }).join("") + (truncated
+      ? `<tr><td colspan="7" style="text-align:center; color:var(--muted); font-size:12px;">+ ${d.byProject.length - 10} more — toggle "show all"</td></tr>`
+      : "");
+  }
+  renderProjects();
+  document.getElementById("projectSearch")?.addEventListener("input", renderProjects);
+  document.getElementById("projectShowAll")?.addEventListener("change", renderProjects);
+
+  // Tool chart (top 12)
+  const topTools = d.byTool.slice(0, 12);
+  new Chart(document.getElementById("toolChart"), {
+    type: "bar",
+    data: {
+      labels: topTools.map(t => t.name.length > 35 ? t.name.slice(0, 32) + "…" : t.name),
+      datasets: [{
+        data: topTools.map(t => +t.approxCost.toFixed(2)),
+        backgroundColor: topTools.map(t => CAT_COLORS[t.category] || "#8a93a3"),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtMoney(ctx.parsed.x) + " · " + topTools[ctx.dataIndex].invocations + " calls" } } },
+      scales: { x: { beginAtZero: true, ticks: { callback: v => Currency.format(v) } } }
+    }
+  });
+
+  // Category breakdown
+  const byCategory = {};
+  d.byTool.forEach(t => { byCategory[t.category] = (byCategory[t.category] || 0) + t.approxCost; });
+  new Chart(document.getElementById("categoryChart"), {
+    type: "doughnut",
+    data: {
+      labels: Object.keys(byCategory).map(k => k.charAt(0).toUpperCase() + k.slice(1)),
+      datasets: [{
+        data: Object.values(byCategory).map(v => +v.toFixed(2)),
+        backgroundColor: Object.keys(byCategory).map(k => CAT_COLORS[k]),
+        borderColor: "#1a2028", borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { padding: 12, font: { size: 11 } } },
+                 tooltip: { callbacks: { label: ctx => ctx.label + ": " + fmtMoney(ctx.parsed) } } }
+    }
+  });
+
+  // All-tools table — top-15 default, search, show-all toggle.
+  const totalToolCost = d.byTool.reduce((s, t) => s + t.approxCost, 0);
+  function renderTools() {
+    const search = (document.getElementById("toolSearch")?.value || "").toLowerCase().trim();
+    const showAll = document.getElementById("toolShowAll")?.checked;
+    let rows = d.byTool;
+    if (search) rows = rows.filter(t => (t.name || "").toLowerCase().includes(search));
+    const truncated = !showAll && rows.length > 15;
+    if (truncated) rows = rows.slice(0, 15);
+    document.getElementById("toolsBody").innerHTML = rows.map(t => {
+      const pct = totalToolCost > 0 ? (t.approxCost / totalToolCost * 100) : 0;
+      const cat = U.esc(t.category);
+      return `<tr>
+        <td>${U.esc(t.name)}</td>
+        <td><span class="pill pill-${cat}">${cat}</span></td>
+        <td class="num">${t.invocations}</td>
+        <td class="num">${fmtMoney(t.approxCost)}</td>
+        <td class="num">${fmtTok(t.approxTokens)}</td>
+        <td><div class="bar-cell"><span style="min-width:42px;">${pct.toFixed(1)}%</span><div class="bar"><div style="width:${Math.min(100, pct * 5)}%; background:${CAT_COLORS[t.category]};"></div></div></div></td>
+      </tr>`;
+    }).join("") + (truncated
+      ? `<tr><td colspan="6" style="text-align:center; color:var(--muted); font-size:12px;">+ ${d.byTool.length - 15} more — toggle "show all"</td></tr>`
+      : "");
+  }
+  renderTools();
+  document.getElementById("toolSearch")?.addEventListener("input", renderTools);
+  document.getElementById("toolShowAll")?.addEventListener("change", renderTools);
+
+  // MCP table
+  document.getElementById("mcpBody").innerHTML = d.byMCPServer.map(m => {
+    const tools = (m.topTools || []).slice(0, 3).map(([n, c]) => `${U.esc(n)} (${c})`).join(", ");
+    return `<tr>
+      <td><strong>${U.esc(m.server)}</strong></td>
+      <td class="num">${m.invocations}</td>
+      <td class="num">${fmtMoney(m.approxCost)}</td>
+      <td style="color:var(--muted); font-size: 11px;">${tools}</td>
+    </tr>`;
+  }).join("");
+
+  // Subagent table
+  document.getElementById("subagentBody").innerHTML = d.bySubagent.length === 0
+    ? `<tr><td colspan="3" style="color:var(--muted); text-align:center;">No subagent invocations recorded.</td></tr>`
+    : d.bySubagent.map(s => `<tr>
+        <td><strong>${U.esc(s.type)}</strong></td>
+        <td class="num">${s.invocations}</td>
+        <td class="num">${fmtMoney(s.approxCost)}</td>
+      </tr>`).join("");
+
+  // ROI table
+  document.getElementById("roiBody").innerHTML = d.byModel.map(m => {
+    const savedCls = m.cacheSavedPct > 70 ? "roi-positive" : m.cacheSavedPct > 40 ? "roi-warn" : "";
+    return `<tr>
+      <td><strong>${U.esc(m.model)}</strong></td>
+      <td class="num">${fmtTok(m.cacheRead)}</td>
+      <td class="num">${fmtTok(m.cacheCreate)}</td>
+      <td class="num">${fmtTok(m.output)}</td>
+      <td class="num">${fmtMoney(m.cost)}</td>
+      <td class="num" style="color: var(--amber);">${fmtMoney(m.noCacheCost)}</td>
+      <td class="num roi-positive">${fmtMoney(m.cacheSaved)}</td>
+      <td class="num ${savedCls}">${m.cacheSavedPct.toFixed(1)}%</td>
+    </tr>`;
+  }).join("");
+
+  // Conversations
+  const convs = (d.conversations || []).slice().sort((a, b) => b.cost - a.cost);
+  const convKPIs = document.getElementById("convKPIs");
+  const totalConvs = convs.length;
+  const totalTurns = convs.reduce((s, c) => s + (c.turns || 0), 0);
+  const totalTokens = convs.reduce((s, c) => s + (c.totalTokens || 0), 0);
+  const avgTurns = totalConvs > 0 ? Math.round(totalTurns / totalConvs) : 0;
+  const avgCtx = totalTurns > 0 ? Math.round((convs.reduce((s, c) => s + ((c.input || 0) + (c.cacheRead || 0)), 0)) / totalTurns) : 0;
+  const longest = convs.reduce((m, c) => ((c.turns || 0) > (m?.turns || 0) ? c : m), null);
+  if (convKPIs) {
+    convKPIs.innerHTML = `
+      <div class="card kpi" style="margin:0;"><div class="label">Conversations</div>
+        <div class="value">${totalConvs}</div>
+        <div class="sub">${totalTurns.toLocaleString()} turns total</div></div>
+      <div class="card kpi" style="margin:0;"><div class="label">Avg turns / conversation</div>
+        <div class="value">${avgTurns}</div>
+        <div class="sub">Longest: ${longest ? longest.turns + ' turns (' + U.esc(longest.name) + ')' : '—'}</div></div>
+      <div class="card kpi" style="margin:0;"><div class="label">Avg context size / turn</div>
+        <div class="value">${fmtTok(avgCtx)}</div>
+        <div class="sub">input + cache_read per turn</div></div>
+      <div class="card kpi" style="margin:0;"><div class="label">Tokens per conversation</div>
+        <div class="value">${fmtTok(totalConvs > 0 ? Math.round(totalTokens / totalConvs) : 0)}</div>
+        <div class="sub">avg across all sessions</div></div>
+    `;
+  }
+  const convBody = document.getElementById("conversationsBody");
+  if (convBody) {
+    if (convs.length === 0) {
+      convBody.innerHTML = `<tr><td colspan="8" style="color:var(--muted); text-align:center;">No conversations in selected range.</td></tr>`;
+    } else {
+      convBody.innerHTML = convs.map(c => {
+        const hit = c.cacheHitRatio * 100;
+        const hitColor = hit > 85 ? "var(--green)" : hit > 50 ? "var(--amber)" : "var(--red)";
+        const dur = c.durationMinutes < 60
+          ? `${c.durationMinutes.toFixed(0)}m`
+          : c.durationMinutes < 1440
+            ? `${(c.durationMinutes/60).toFixed(1)}h`
+            : `${(c.durationMinutes/1440).toFixed(1)}d`;
+        const sid = (c.sessionId || "").slice(0, 8);
+        const src = U.esc(c.source);
+        return `<tr>
+          <td><strong>${U.esc(c.name || '—')}</strong>
+              <div style="color: var(--muted); font-size: 11px;">${U.esc(sid)}…</div></td>
+          <td><span class="pill pill-${src}">${src}</span></td>
+          <td class="num">${c.turns}</td>
+          <td class="num">${fmtTok(c.totalTokens)}</td>
+          <td class="num">${fmtTok(c.avgContextPerTurn)}</td>
+          <td class="num" style="color:${hitColor};">${hit.toFixed(0)}%</td>
+          <td class="num" style="color: var(--muted);">${dur}</td>
+          <td class="num">${fmtMoney(c.cost)}</td>
+        </tr>`;
+      }).join("");
+    }
+  }
+
+  // Source coverage
+  document.getElementById("sourcesBody").innerHTML = `
+    <tr><td><span class="pill pill-cli">CLI</span> ${getEnv()}\\.claude\\projects</td><td class="num">${fmtMoney(d.bySource.cli.cost)}</td><td class="num">${d.bySource.cli.turns}</td><td class="num">${fmtTok(d.bySource.cli.cacheRead)}</td><td>Local Claude Code CLI sessions on this machine.</td></tr>
+    <tr><td><span class="pill pill-cowork">Cowork</span> %APPDATA%\\Claude\\local-agent-mode-sessions</td><td class="num">${fmtMoney(d.bySource.cowork.cost)}</td><td class="num">${d.bySource.cowork.turns}</td><td class="num">${fmtTok(d.bySource.cowork.cacheRead)}</td><td>Claude Desktop cowork sessions on this machine.</td></tr>
+  `;
+}
+
+function getEnv() { return "%USERPROFILE%"; }
+</script>
+</body>
+</html>

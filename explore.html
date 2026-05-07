@@ -1,0 +1,2175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Explore — Claude Code Usage</title>
+<link rel="stylesheet" href="themes.css" />
+<script src="util.js"></script>
+<script src="theme.js"></script>
+<script src="currency.js"></script>
+<script src="tzmode.js"></script>
+<script src="plan.js"></script>
+<script src="settings.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>
+  /* Theme tokens come from themes.css; only add layout/utility styles below */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 24px;
+    margin-bottom: 4px;
+  }
+  .subtitle { color: var(--muted); margin-bottom: 24px; font-size: 14px; }
+  .nav { margin-bottom: 24px; font-size: 13px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .nav a { color: var(--accent); text-decoration: none; }
+  .nav a:hover { text-decoration: underline; }
+
+  /* Tab bar */
+  .wrap { max-width: 1340px; margin: 0 auto; padding: 24px; }
+  .tab-bar { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .tab-btn {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--muted); font-size: 14px; font-weight: 500; font-family: inherit;
+    padding: 10px 20px; cursor: pointer; margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Dashboard (Charts tab) styles */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 6px;
+  }
+  .badge.cli { background: rgba(96, 165, 250, 0.2); color: #60a5fa; }
+  .badge.cowork { background: rgba(244, 114, 182, 0.2); color: #f472b6; }
+  .grid-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .grid-charts {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .grid-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .grid-charts, .grid-bottom, .grid-2 { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .kpi .label {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .kpi .value {
+    font-size: 26px;
+    font-weight: 600;
+  }
+  .kpi .sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .card h2 {
+    font-size: 14px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    font-weight: 500;
+  }
+  .chart-wrap { position: relative; height: 320px; }
+  .chart-wrap.tall { height: 400px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ratio-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .ratio-bar > div {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--blue));
+  }
+  .legend-inline {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .legend-inline .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  /* Insights (Breakdown tab) styles */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+  .pill-builtin  { background: rgba(96, 165, 250, 0.18);  color: #60a5fa; }
+  .pill-mcp      { background: rgba(244, 114, 182, 0.18); color: #f472b6; }
+  .pill-plugin   { background: rgba(217, 119, 87, 0.18);  color: #d97757; }
+  .pill-subagent { background: rgba(167, 139, 250, 0.18); color: #a78bfa; }
+  .pill-unknown  { background: rgba(138, 147, 163, 0.18); color: #8a93a3; }
+  .pill-cli      { background: rgba(96, 165, 250, 0.18); color: #60a5fa; }
+  .pill-cowork   { background: rgba(244, 114, 182, 0.18); color: #f472b6; }
+  .bar-cell { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+  .bar-cell .bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .bar-cell .bar > div { height: 100%; background: var(--accent); }
+  .footnote { color: var(--muted); font-size: 11px; margin-top: 8px; line-height: 1.4; }
+  details { margin-top: 8px; }
+  details summary { cursor: pointer; color: var(--accent); font-size: 12px; }
+  .roi-positive { color: var(--green); }
+  .roi-warn     { color: var(--amber); }
+
+  /* Page-internal jump nav — sticky in-page */
+  .page-nav {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    background: var(--bg-overlay);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    position: sticky; top: 70px; z-index: 40;
+    font-size: 12px;
+  }
+  .page-nav a {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    transition: background 0.1s, color 0.1s;
+  }
+  .page-nav a:hover { color: var(--text); background: var(--card-hi); }
+
+  /* Section anchors need scroll-margin */
+  #summary, #conversations, #trends, #projects, #tools,
+  #mcp-subagents, #roi, #sources { scroll-margin-top: 130px; }
+
+  /* Headline insights */
+  .headline { background: linear-gradient(135deg, rgba(217,119,87,0.06), rgba(167,139,250,0.04)); }
+  .headline h2 { color: var(--accent); margin-bottom: 8px; }
+  .headline ul li {
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 14px;
+    color: var(--text);
+  }
+  .headline ul li:last-child { border-bottom: 0; }
+  .headline ul li::before {
+    content: "▸";
+    color: var(--accent);
+    margin-right: 8px;
+    font-size: 11px;
+  }
+  .headline strong { color: var(--accent); }
+  .headline em { color: var(--green); font-style: normal; font-weight: 600; }
+
+  .trend-tab {
+    background: var(--bg); color: var(--muted); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 12px; font-size: 12px; font-family: inherit; cursor: pointer;
+  }
+  .trend-tab:hover { color: var(--text); border-color: var(--accent); }
+  .trend-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+  /* Breakdown tab — card margin for stacked layout */
+  #tab-breakdown .card { margin-bottom: 20px; }
+  #tab-breakdown .grid-2 .card { margin-bottom: 0; }
+  #tab-breakdown .grid-kpis .card { margin-bottom: 0; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+
+  <div class="nav">
+    <a href="index.html" style="font-weight: 600;">← Home</a>
+    <a href="explore.html" style="color: var(--text);">Explore</a>
+    <a href="timeline.html">Timeline</a>
+    <a href="projects.html">Projects</a>
+    <a href="improvements.html">Improvements</a>
+    <a href="plan.html">Plan</a>
+    <a href="tour.html">Story</a>
+    <a href="glossary.html">Glossary</a>
+    <span style="margin-left:auto; display:inline-flex; gap:8px; align-items:center;">
+      <span id="themeToggle"></span><span id="settings"></span>
+    </span>
+  </div>
+  <script>
+    ThemeToggle.mount("themeToggle");
+    Settings.mount("settings");
+  </script>
+
+  <h1>Explore</h1>
+  <p class="subtitle" id="subtitleHeader">Includes <strong>CLI</strong> and <strong>Cowork (desktop)</strong> sessions across every machine</p>
+
+  <div id="machineBanner" style="margin-bottom: 16px;"></div>
+  <script src="machines/manifest.js" onerror="this.remove()"></script>
+
+  <div id="dateFilter" style="margin-bottom: 16px;"></div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="charts">Charts</button>
+    <button class="tab-btn" data-tab="breakdown">Breakdown</button>
+  </div>
+
+  <!-- ── Charts tab ─────────────────────────────────────────────────────── -->
+  <div id="tab-charts" class="tab-panel">
+    <div class="grid-kpis" id="kpiGrid"></div>
+
+    <div class="grid-charts">
+      <div class="card">
+        <h2>Daily Cost</h2>
+        <div class="legend-inline">
+          <span><span class="dot" style="background:#60a5fa;"></span>CLI</span>
+          <span><span class="dot" style="background:#f472b6;"></span>Cowork</span>
+        </div>
+        <div class="chart-wrap"><canvas id="costChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Token Composition</h2>
+        <div class="chart-wrap"><canvas id="compositionChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid-bottom">
+      <div class="card">
+        <h2>Daily Tokens (Stacked)</h2>
+        <div class="chart-wrap"><canvas id="tokensChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Cache Hit Ratio per Day</h2>
+        <div class="chart-wrap"><canvas id="hitRatioChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid-bottom" style="margin-top: 24px;">
+      <div class="card">
+        <h2>Cost by Model</h2>
+        <div class="chart-wrap"><canvas id="modelChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Cost: CLI vs Cowork</h2>
+        <div class="chart-wrap"><canvas id="sourceChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 24px;">
+      <h2>Cost by Model &amp; Pricing Tier <span style="font-size: 10px; color: var(--muted); background: var(--card-hi); padding: 2px 8px; border-radius: 999px; margin-left: 8px;">all-time, this machine</span></h2>
+      <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+        Standard = current API pricing (what you were billed). Batch = same workload via Batch API (50% off all token types, 24h async SLA, not used by Claude Code).
+        Prompt-caching savings are already baked into Standard — see "Caching saved" column.
+        This card is a lifetime pricing comparison and does <em>not</em> react to the Date / Machine / Project filters.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th class="num">Input</th>
+            <th class="num">Output</th>
+            <th class="num">Cache Write</th>
+            <th class="num">Cache Read</th>
+            <th class="num">Standard $</th>
+            <th class="num">Batch (50% off) $</th>
+            <th class="num">No-Cache Hypothetical $</th>
+            <th class="num">Caching Saved</th>
+          </tr>
+        </thead>
+        <tbody id="modelPricingBody"></tbody>
+        <tfoot id="modelPricingFoot"></tfoot>
+      </table>
+    </div>
+
+    <div class="grid-bottom" style="margin-top: 24px;">
+      <div class="card">
+        <h2>Cost by Model — Pricing Tier Comparison <span style="font-size: 10px; color: var(--muted); background: var(--card-hi); padding: 2px 8px; border-radius: 999px; margin-left: 8px;">all-time</span></h2>
+        <div class="chart-wrap"><canvas id="tierChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Caching Savings vs No-Cache <span style="font-size: 10px; color: var(--muted); background: var(--card-hi); padding: 2px 8px; border-radius: 999px; margin-left: 8px;">all-time</span></h2>
+        <div class="chart-wrap"><canvas id="cacheSavingsChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 24px;">
+      <h2>Sessions</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Session</th>
+            <th>Source</th>
+            <th>Models</th>
+            <th class="num">Total Tokens</th>
+            <th class="num">Hit Ratio</th>
+            <th class="num">Cost</th>
+          </tr>
+        </thead>
+        <tbody id="sessionBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-top: 24px;">
+      <h2>Daily Breakdown</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Models</th>
+            <th class="num">Input</th>
+            <th class="num">Output</th>
+            <th class="num">Cache Create</th>
+            <th class="num">Cache Read</th>
+            <th class="num">Total Tokens</th>
+            <th class="num">Hit Ratio</th>
+            <th class="num">Cost</th>
+          </tr>
+        </thead>
+        <tbody id="dailyBody"></tbody>
+        <tfoot id="dailyFoot"></tfoot>
+      </table>
+    </div>
+  </div><!-- /tab-charts -->
+
+  <!-- ── Breakdown tab ──────────────────────────────────────────────────── -->
+  <div id="tab-breakdown" class="tab-panel" style="display:none;">
+    <p class="subtitle" id="subtitle" style="margin-bottom: 12px;">Loading…</p>
+
+    <!-- In-page nav -->
+    <nav class="page-nav">
+      <a href="#summary">Summary</a>
+      <a href="#conversations">Conversations</a>
+      <a href="#trends">Trends</a>
+      <a href="#projects">Projects</a>
+      <a href="#tools">Tools</a>
+      <a href="#mcp-subagents">MCP &amp; Subagents</a>
+      <a href="#roi">Cache ROI</a>
+      <a href="#sources">Sources</a>
+    </nav>
+
+    <div class="card headline" id="summary">
+      <h2>Headline Insights</h2>
+      <ul id="headlineList" style="list-style:none; padding:0; margin:0;"></ul>
+    </div>
+
+    <div class="grid-kpis" id="kpis"></div>
+
+    <div class="card" id="conversations">
+      <h2>Conversations — Context Spend</h2>
+      <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+        Each row is one Claude Code session (sessionId). <strong>Avg context</strong> approximates the running prompt size by summing input + cache_read tokens, divided by turns.
+        Long conversations with low cache hit ratios are usually the ones burning the most context.
+      </p>
+      <div class="grid-kpis" id="convKPIs" style="margin-bottom: 16px;"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>Project / Session</th>
+            <th>Source</th>
+            <th class="num">Turns</th>
+            <th class="num">Total Tokens</th>
+            <th class="num">Avg Context / Turn</th>
+            <th class="num">Cache Hit</th>
+            <th class="num">Duration</th>
+            <th class="num">Cost</th>
+          </tr>
+        </thead>
+        <tbody id="conversationsBody"></tbody>
+      </table>
+      <p class="footnote">
+        Duration is wall-clock time between first and last assistant message. Long durations on few-turn sessions usually mean the session was left open idle.
+      </p>
+    </div>
+
+    <div class="card" id="trends">
+      <h2>Trends Over Time — Where Attribution Is Shifting</h2>
+      <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+        Daily attribution mix. Stacked bars show cost composition per day across each dimension. Hover for exact values.
+      </p>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+        <button class="trend-tab active" data-tab="byProject">By Project</button>
+        <button class="trend-tab" data-tab="byCategory">By Tool Category</button>
+        <button class="trend-tab" data-tab="byMCPServer">By MCP Server</button>
+        <button class="trend-tab" data-tab="byModel">By Model</button>
+        <button class="trend-tab" data-tab="bySource">By Source (CLI/Cowork)</button>
+      </div>
+      <div class="chart-wrap tall"><canvas id="trendChart"></canvas></div>
+      <p class="footnote">Days where you didn't run Claude show as gaps. Earliest data: starts of your usage history; we only see local + cowork from <em>this</em> machine.</p>
+    </div>
+
+    <div class="grid-2" id="projects">
+      <div class="card">
+        <h2>Cost by Project</h2>
+        <div class="chart-wrap"><canvas id="projectChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>CLI vs Cowork by Project</h2>
+        <div class="chart-wrap"><canvas id="sourceProjectChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <span>Per-Project Detail</span>
+        <span style="display:inline-flex; gap:8px; align-items:center; font-weight:400; text-transform:none; letter-spacing:0;">
+          <input type="text" id="projectSearch" placeholder="filter by name…"
+                 style="background: var(--bg-soft); color: var(--text); border:1px solid var(--border); border-radius:6px; padding:5px 8px; font-size:12px; width:180px;" />
+          <label style="color:var(--muted); font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+            <input type="checkbox" id="projectShowAll" /> show all
+          </label>
+        </span>
+      </h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Project (cwd)</th>
+            <th class="num">Cost</th>
+            <th class="num">CLI / Cowork</th>
+            <th class="num">Tokens</th>
+            <th class="num">Cache Hit</th>
+            <th class="num">Turns</th>
+            <th>Top Tools</th>
+          </tr>
+        </thead>
+        <tbody id="projectsBody"></tbody>
+      </table>
+      <p class="footnote">Cache hit ratio = cache_read / (cache_read + cache_create). Low ratios suggest workflows that fetch fresh data each time — optimization targets. Top 10 by cost shown by default; toggle "show all" to expand.</p>
+    </div>
+
+    <div class="grid-2" id="tools">
+      <div class="card">
+        <h2>Tool Cost Breakdown</h2>
+        <div class="chart-wrap tall"><canvas id="toolChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Cost by Category</h2>
+        <div class="chart-wrap tall"><canvas id="categoryChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <span>All Tools — Approximate Cost Attribution</span>
+        <span style="display:inline-flex; gap:8px; align-items:center; font-weight:400; text-transform:none; letter-spacing:0;">
+          <input type="text" id="toolSearch" placeholder="filter by name…"
+                 style="background: var(--bg-soft); color: var(--text); border:1px solid var(--border); border-radius:6px; padding:5px 8px; font-size:12px; width:180px;" />
+          <label style="color:var(--muted); font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+            <input type="checkbox" id="toolShowAll" /> show all
+          </label>
+        </span>
+      </h2>
+      <p style="color: var(--muted); font-size: 12px; margin-bottom: 8px;">
+        Cost per turn is split evenly across tools used in that turn (rough proxy — a turn with 3 tools attributes 1/3 to each). Top 15 by cost shown by default.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Tool</th>
+            <th>Category</th>
+            <th class="num">Invocations</th>
+            <th class="num">Approx Cost</th>
+            <th class="num">Approx Tokens</th>
+            <th>% of Total</th>
+          </tr>
+        </thead>
+        <tbody id="toolsBody"></tbody>
+      </table>
+    </div>
+
+    <div id="mcp-subagents">
+      <div class="grid-2">
+        <div class="card">
+          <h2>MCP Servers</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Server</th>
+                <th class="num">Calls</th>
+                <th class="num">Cost</th>
+                <th>Share</th>
+                <th>Top Tools</th>
+              </tr>
+            </thead>
+            <tbody id="mcpBody"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h2>Subagents <span style="font-weight:400; font-size:13px; color:var(--muted);">by type</span></h2>
+          <div style="position:relative;">
+            <canvas id="subagentChart"></canvas>
+            <p id="subagentEmpty" style="display:none; color:var(--muted); text-align:center; padding:32px 0;">No subagent invocations recorded.</p>
+          </div>
+          <p class="footnote" style="margin-top:8px;">Subagents (Agent tool calls with subagent_type) run as separate API conversations. Costs approximate parent-turn attribution; actual subagent compute is included in totals.</p>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px;">
+        <h2>Plugins <span style="font-weight:400; font-size:13px; color:var(--muted);">by server</span></h2>
+        <div id="pluginSection">
+          <canvas id="pluginChart"></canvas>
+        </div>
+        <p class="footnote" style="margin-top:8px;">Plugin tools (<code>mcp__plugin_*</code>) aggregated by plugin server. Skills (Skill tool calls) are grouped generically — individual skill names are not tracked.</p>
+      </div>
+    </div>
+
+    <div class="card" id="roi">
+      <h2>Cache ROI by Model</h2>
+      <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+        What you actually paid (Standard) vs hypothetical cost without prompt caching. Higher % saved = better ROI from cache reuse.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th class="num">Cache Read Tokens</th>
+            <th class="num">Cache Write Tokens</th>
+            <th class="num">Output Tokens</th>
+            <th class="num">Standard Cost</th>
+            <th class="num">No-Cache Cost</th>
+            <th class="num">Saved</th>
+            <th class="num">% Saved</th>
+          </tr>
+        </thead>
+        <tbody id="roiBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card" id="sources">
+      <h2>Source Coverage</h2>
+      <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+        Where your data was found. Multi-machine sync (planned Phase 2) will add per-hostname rows here.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Source</th><th class="num">Cost</th><th class="num">Turns</th><th class="num">Tokens (cache reads)</th><th>Note</th></tr>
+        </thead>
+        <tbody id="sourcesBody"></tbody>
+      </table>
+      <p class="footnote">
+        <strong>Methodology:</strong> Costs computed from raw JSONL using Anthropic published rates (Opus $5/$25, Sonnet $3/$15, Haiku $1/$5 per 1M; cache writes ×1.25, cache reads ×0.10).
+        Totals on this page may exceed <a href="dashboard.html" style="color: var(--accent);">dashboard.html</a> because every assistant turn (including autocompaction summaries and subagent compute) is counted individually here for attribution.
+        All numbers are <strong>API-equivalent value</strong> — you actually pay $100/mo flat under Max 5×.
+      </p>
+    </div>
+  </div><!-- /tab-breakdown -->
+
+<script src="usage_data.js" onerror="this.remove()"></script>
+<script src="date_filter.js"></script>
+<script>
+// ── 1. Shared helpers ─────────────────────────────────────────────────────
+const fmtMoney  = (usd, decimals=2) => Currency.format(usd, { decimals });
+const fmtMoney4 = usd => Currency.format(usd, { decimals: 4 });
+const fmtTok = n => n >= 1e6 ? (n/1e6).toFixed(2)+"M" : n >= 1e3 ? (n/1e3).toFixed(1)+"K" : (n||0).toString();
+const fmtNum = n => (n||0).toLocaleString();
+const fmt = n => n.toLocaleString();
+Chart.defaults.color = "#8a93a3";
+Chart.defaults.borderColor = "#2a3441";
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+function destroyChart(id) { const c = Chart.getChart(id); if (c) c.destroy(); }
+
+// ── 2. Tab switching ──────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll(".tab-panel").forEach(p => { p.style.display = "none"; });
+  document.querySelectorAll(".tab-btn").forEach(b => { b.classList.remove("active"); });
+  const panel = document.getElementById("tab-" + name);
+  const btn   = document.querySelector(`.tab-btn[data-tab="${name}"]`);
+  if (panel) panel.style.display = "";
+  if (btn)   btn.classList.add("active");
+  history.replaceState(null, "", "#" + name);
+}
+
+function initTabs() {
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => showTab(btn.dataset.tab));
+  });
+  const hash = (location.hash || "").replace("#", "");
+  showTab(hash === "breakdown" ? "breakdown" : "charts");
+}
+initTabs();
+
+// ── 3. Dashboard JS (Charts tab) ──────────────────────────────────────────
+// Currency-aware money formatter (Currency.format honours USD/EUR + rate)
+
+// One pass over a daily[] returning every sum the renderers need.
+function sumDaily(rows) {
+  const t = { cost: 0, cli: 0, cowork: 0, total: 0,
+              input: 0, output: 0, cacheCreate: 0, cacheRead: 0,
+              days: 0, peak: null };
+  for (const d of rows) {
+    t.cost        += d.cost        || 0;
+    t.cli         += d.cliCost     || 0;
+    t.cowork      += d.coworkCost  || 0;
+    t.total       += d.total       || 0;
+    t.input       += d.input       || 0;
+    t.output      += d.output      || 0;
+    t.cacheCreate += d.cacheCreate || 0;
+    t.cacheRead   += d.cacheRead   || 0;
+    t.days       += 1;
+    if (!t.peak || (d.cost || 0) > (t.peak.cost || 0)) t.peak = d;
+  }
+  t.hitRatio = (t.cacheRead + t.cacheCreate) > 0
+    ? t.cacheRead / (t.cacheRead + t.cacheCreate)
+    : 0;
+  return t;
+}
+
+function makeChart(id, cfg) {
+  destroyChart(id);
+  const el = document.getElementById(id);
+  if (!el) return null;
+  return new Chart(el, cfg);
+}
+
+const chartOpts = {
+  responsive: true,
+  maintainAspectRatio: false,
+};
+
+function reshapeUsage(u) {
+  return (u.daily || []).map(d => ({
+    date: d.date,
+    input: d.inputTokens || 0,
+    output: d.outputTokens || 0,
+    cacheCreate: d.cacheCreationTokens || 0,
+    cacheRead: d.cacheReadTokens || 0,
+    total: d.totalTokens || 0,
+    cost: d.totalCost || 0,
+    cliCost: d.cliCost || 0,
+    coworkCost: d.coworkCost || 0,
+    models: (d.models || []).join(", "),
+  }));
+}
+
+function reshapeMachine(snap) {
+  return (snap.daily || []).map(d => ({
+    date: d.date,
+    input: d.inputTokens || 0,
+    output: d.outputTokens || 0,
+    cacheCreate: d.cacheCreationTokens || 0,
+    cacheRead: d.cacheReadTokens || 0,
+    total: d.totalTokens || 0,
+    cost: d.totalCost || 0,
+    cliCost: d.cliCost || 0,
+    coworkCost: d.coworkCost || 0,
+    models: (d.models || []).join(", "),
+  }));
+}
+
+const LOCAL_DAILY = (window.USAGE_DATA && window.USAGE_DATA.daily && window.USAGE_DATA.daily.length)
+  ? reshapeUsage(window.USAGE_DATA)
+  : [];
+if (!LOCAL_DAILY.length) {
+  document.getElementById("subtitleHeader").innerHTML =
+    `<span style="color: var(--amber);">No data on this machine yet.</span> Run <code>bash update_usage.sh</code> to populate.`;
+}
+
+function mergeMachines(byHost) {
+  const byDate = new Map();
+  for (const rows of Object.values(byHost)) {
+    for (const r of rows) {
+      const cur = byDate.get(r.date) || {
+        date: r.date, input: 0, output: 0, cacheCreate: 0, cacheRead: 0,
+        total: 0, cost: 0, cliCost: 0, coworkCost: 0, models: "",
+      };
+      cur.input += r.input; cur.output += r.output;
+      cur.cacheCreate += r.cacheCreate; cur.cacheRead += r.cacheRead;
+      cur.total += r.total; cur.cost += r.cost;
+      cur.cliCost += r.cliCost; cur.coworkCost += r.coworkCost;
+      const merged = new Set([
+        ...(cur.models ? cur.models.split(", ") : []),
+        ...(r.models   ? r.models.split(", ")   : [])
+      ].filter(Boolean));
+      cur.models = [...merged].join(", ");
+      byDate.set(r.date, cur);
+    }
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+let ALL_DAILY = LOCAL_DAILY.slice();
+let dailyData = ALL_DAILY.slice();
+
+let CURRENT_PROJECT = "all";
+let CURRENT_SOURCE  = "all";
+let CURRENT_MACHINE = "all";
+let LAST_DATE_RANGE = { key: "all", startISO: null, endISO: null };
+let INSIGHTS_FOR_FILTER = null;
+let MACHINES_DAILY = null;
+let LOCAL_HOST     = null;
+
+const WT_RE = /^(.*?) \(wt: ([^)]+)\)$/;
+function projectMatchesFilter(name, filter) {
+  if (filter === "all") return true;
+  if (name === filter) return true;
+  const m = WT_RE.exec(name);
+  return !!(m && m[1] === filter);
+}
+
+function computeFilteredDaily() {
+  let base;
+  if (CURRENT_PROJECT === "all" || !INSIGHTS_FOR_FILTER) {
+    base = ALL_DAILY.map(d => ({ ...d }));
+  } else {
+    const trend = (INSIGHTS_FOR_FILTER.dailyTrend || []);
+    const allByDate = new Map(ALL_DAILY.map(d => [d.date, d]));
+    const out = [];
+    let skipped = 0, skippedCost = 0;
+    RECONCILE_GAP = { skipped: 0, skippedCost: 0 };
+    for (const d of trend) {
+      const ccDay = allByDate.get(d.date);
+      if (!ccDay) {
+        const projHere = Object.entries(d.byProject || {})
+          .filter(([n]) => projectMatchesFilter(n, CURRENT_PROJECT))
+          .reduce((s, [, c]) => s + c, 0);
+        if (projHere > 0) { skipped += 1; skippedCost += projHere; }
+        continue;
+      }
+      const byProject = d.byProject || {};
+      const detail    = d.projectsDetail || {};
+      let projInsightsCost = 0, cliShareNum = 0, coworkShareNum = 0;
+      let input = 0, output = 0, cacheCreate = 0, cacheRead = 0, turns = 0;
+      const dayInsightsCli    = (d.bySource || {}).cli    || 0;
+      const dayInsightsCowork = (d.bySource || {}).cowork || 0;
+      const dayInsightsTotal  = dayInsightsCli + dayInsightsCowork || 0;
+      for (const [name, cost] of Object.entries(byProject)) {
+        if (!projectMatchesFilter(name, CURRENT_PROJECT)) continue;
+        projInsightsCost += cost;
+        const pd = detail[name];
+        if (pd && pd.bySource) {
+          cliShareNum    += pd.bySource.cli    || 0;
+          coworkShareNum += pd.bySource.cowork || 0;
+        } else if (dayInsightsTotal > 0) {
+          cliShareNum    += cost * dayInsightsCli    / dayInsightsTotal;
+          coworkShareNum += cost * dayInsightsCowork / dayInsightsTotal;
+        }
+        if (pd) {
+          input       += pd.input       || 0;
+          output      += pd.output      || 0;
+          cacheCreate += pd.cacheCreate || 0;
+          cacheRead   += pd.cacheRead   || 0;
+          turns       += pd.turns       || 0;
+        }
+      }
+      if (projInsightsCost <= 0) continue;
+
+      const insightsDayTotal = dayInsightsTotal || projInsightsCost;
+      const shareTotal = projInsightsCost / insightsDayTotal;
+      const ccTotal    = ccDay.cost || 0;
+      const projCost   = +(ccTotal * shareTotal).toFixed(4);
+      const insightsCliTotal    = dayInsightsCli;
+      const insightsCoworkTotal = dayInsightsCowork;
+      const projCli    = insightsCliTotal    > 0 ? +(ccDay.cliCost    * (cliShareNum    / insightsCliTotal   )).toFixed(4) : 0;
+      const projCowork = insightsCoworkTotal > 0 ? +(ccDay.coworkCost * (coworkShareNum / insightsCoworkTotal)).toFixed(4) : 0;
+      out.push({
+        date: d.date,
+        input, output, cacheCreate, cacheRead,
+        total: input + output + cacheCreate + cacheRead,
+        cost: projCost,
+        cliCost:    projCli,
+        coworkCost: projCowork,
+        models: "",
+      });
+    }
+    base = out;
+    RECONCILE_GAP = { skipped, skippedCost };
+  }
+  if (CURRENT_SOURCE === "cli") {
+    base = base.map(d => ({ ...d, cost: d.cliCost,    coworkCost: 0 }));
+  } else if (CURRENT_SOURCE === "cowork") {
+    base = base.map(d => ({ ...d, cost: d.coworkCost, cliCost:    0 }));
+  }
+  return base;
+}
+
+let RECONCILE_GAP = { skipped: 0, skippedCost: 0 };
+
+function applyAllFilters() {
+  const all = computeFilteredDaily();
+  dailyData = all.filter(d => DateFilter.inRange(d.date, LAST_DATE_RANGE.startISO, LAST_DATE_RANGE.endISO));
+  renderKPIs();
+  renderTimeSeriesCharts();
+  renderDailyTable();
+  renderReconcileNote();
+  if (typeof renderSourceChart   === "function") renderSourceChart();
+  if (typeof renderSessionTable  === "function") renderSessionTable();
+  if (typeof renderModelChart    === "function") renderModelChart();
+}
+
+function renderReconcileNote() {
+  let host = document.getElementById("reconcileNote");
+  if (!host) {
+    const insertBefore = document.querySelector(".grid-kpis");
+    if (!insertBefore) return;
+    host = document.createElement("div");
+    host.id = "reconcileNote";
+    host.style.cssText = "margin-bottom: 16px;";
+    insertBefore.insertAdjacentElement("afterend", host);
+  }
+  if (CURRENT_PROJECT === "all" || RECONCILE_GAP.skipped === 0) {
+    host.innerHTML = "";
+    return;
+  }
+  host.innerHTML = `
+    <div style="background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--muted);">
+      <strong style="color: var(--amber);">Note:</strong>
+      Skipped ${RECONCILE_GAP.skipped} day(s) where insights had data but ccusage didn't —
+      ~${Currency.format(RECONCILE_GAP.skippedCost)} of project cost not reflected in this filter.
+    </div>
+  `;
+}
+
+function loadInsightsForFilter() {
+  if (INSIGHTS_FOR_FILTER) return Promise.resolve(INSIGHTS_FOR_FILTER);
+  if (window.INSIGHTS) { INSIGHTS_FOR_FILTER = window.INSIGHTS; return Promise.resolve(window.INSIGHTS); }
+  return new Promise(res => {
+    const s = document.createElement("script");
+    s.src = "insights_data.js";
+    s.onload = s.onerror = () => {
+      INSIGHTS_FOR_FILTER = window.INSIGHTS || null;
+      res(INSIGHTS_FOR_FILTER);
+    };
+    document.head.appendChild(s);
+  });
+}
+
+const SAMPLE_SESSION_DATA = [
+  { session: "report-mcp",          source: "CLI",    models: "opus-4-6",    total: 24542000, cacheRead: 22991000, cacheCreate: 1519400, cost: 21.76 },
+  { session: "wizardly-darwin",     source: "Cowork", models: "opus-4-7",    total: 13581000, cacheRead: 12813000, cacheCreate: 629817,  cost: 13.79 },
+  { session: "tmdl-generator",      source: "CLI",    models: "opus-4-7",    total: 1048500,  cacheRead: 985013,   cacheCreate: 46116,   cost: 1.21 },
+];
+const SAMPLE_MODEL_TOTALS = {
+  "opus-4-6":   { tokens: 25005850, cost: 24.40 },
+  "opus-4-7":   { tokens: 17669434, cost: 17.90 },
+  "sonnet-4-6": { tokens: 3312810,  cost: 1.89 },
+  "haiku-4-5":  { tokens: 219629,   cost: 0.13 },
+};
+const SAMPLE_MODEL_PRICING = [
+  { model: "opus-4-6",   input: 3271, output: 43524,  cacheWrite: 1880660, cacheRead: 23078895, standard: 24.3980 },
+  { model: "opus-4-7",   input: 377,  output: 187509, cacheWrite: 778079,  cacheRead: 16703469, standard: 17.9043 },
+  { model: "sonnet-4-6", input: 114,  output: 20831,  cacheWrite: 170026,  cacheRead: 3121839,  standard: 1.8870 },
+  { model: "haiku-4-5",  input: 1336, output: 5,      cacheWrite: 88960,   cacheRead: 129328,   standard: 0.1255 },
+];
+
+function buildLiveModelData() {
+  const ins = window.INSIGHTS;
+  if (!ins || !ins.byModel || !ins.byModel.length) {
+
+    return { sessionData: SAMPLE_SESSION_DATA, modelTotals: SAMPLE_MODEL_TOTALS, modelPricing: SAMPLE_MODEL_PRICING };
+  }
+  const modelTotals = {};
+  const modelPricing = ins.byModel.map(m => {
+    const short = (m.model || "").replace("claude-", "").replace(/-\d{8}$/, "");
+    modelTotals[short] = { tokens: (m.input || 0) + (m.output || 0) + (m.cacheCreate || 0) + (m.cacheRead || 0), cost: m.cost || 0 };
+    return {
+      model: short,
+      input: m.input || 0,
+      output: m.output || 0,
+      cacheWrite: m.cacheCreate || 0,
+      cacheRead:  m.cacheRead   || 0,
+      standard:   m.cost || 0,
+    };
+  });
+  const sessionData = ((ins.conversations || []).slice(0, 9)).map(c => ({
+    session: c.name || (c.sessionId || "").slice(0, 12),
+    source:  (c.source || "CLI").toUpperCase() === "CLI" ? "CLI" : "Cowork",
+    models:  (c.model || "").replace("claude-", "").replace(/-\d{8}$/, ""),
+    total:   c.totalTokens || 0,
+    cacheRead:   c.cacheRead   || 0,
+    cacheCreate: c.cacheCreate || 0,
+    cost:    c.cost || 0,
+  }));
+  return { sessionData, modelTotals, modelPricing };
+}
+const __live = buildLiveModelData();
+const sessionData  = __live.sessionData;
+const modelTotals  = __live.modelTotals;
+const modelPricing = __live.modelPricing;
+
+function pricingDerivedRow(p) {
+  const totalTokens = p.input + p.output + p.cacheWrite + p.cacheRead;
+  const batch = p.standard * 0.5;
+  const weighted = p.input * 1.0 + p.output * 5.0 + p.cacheWrite * 1.25 + p.cacheRead * 0.1;
+  const cacheReadShare = (p.cacheRead * 0.1) / weighted;
+  const cacheReadCost = p.standard * cacheReadShare;
+  const noCacheCost = p.standard - cacheReadCost + (cacheReadCost * 10);
+  return { totalTokens, batch, noCacheCost, cacheSaved: noCacheCost - p.standard };
+}
+
+const fmtT = n => n >= 1e6 ? (n/1e6).toFixed(2) + 'M' : n >= 1e3 ? (n/1e3).toFixed(1) + 'K' : n;
+
+function renderDailyTable() {
+  const tbody = document.getElementById('dailyBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  dailyData.forEach(d => {
+    const hit = d.cacheRead + d.cacheCreate > 0
+      ? (d.cacheRead / (d.cacheRead + d.cacheCreate) * 100).toFixed(1)
+      : '0.0';
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${U.esc(d.date)}</td>
+        <td style="color: var(--muted);">${U.esc(d.models)}</td>
+        <td class="num">${fmt(d.input)}</td>
+        <td class="num">${fmt(d.output)}</td>
+        <td class="num">${fmt(d.cacheCreate)}</td>
+        <td class="num">${fmt(d.cacheRead)}</td>
+        <td class="num">${fmt(d.total)}</td>
+        <td class="num" style="color: var(--green);">${hit}%</td>
+        <td class="num">${fmtMoney(d.cost)}</td>
+      </tr>
+    `);
+  });
+  const tfoot = document.getElementById('dailyFoot');
+  if (tfoot) {
+    const t = sumDaily(dailyData);
+    const hit = (t.hitRatio * 100).toFixed(2);
+    tfoot.innerHTML = `
+      <tr style="font-weight: 600;">
+        <td>Total (${t.days} days)</td>
+        <td>—</td>
+        <td class="num">${fmt(t.input)}</td>
+        <td class="num">${fmt(t.output)}</td>
+        <td class="num">${fmt(t.cacheCreate)}</td>
+        <td class="num">${fmt(t.cacheRead)}</td>
+        <td class="num">${fmt(t.total)}</td>
+        <td class="num" style="color: var(--green);">${hit}%</td>
+        <td class="num">${fmtMoney(t.cost)}</td>
+      </tr>
+    `;
+  }
+}
+renderDailyTable();
+
+function renderSessionTable() {
+  const sbody = document.getElementById('sessionBody');
+  if (!sbody) return;
+  let convs;
+  if (window.INSIGHTS && Array.isArray(window.INSIGHTS.conversations)) {
+    const inDate = (ts) => DateFilter.inRange((ts || "").slice(0, 10),
+                                              LAST_DATE_RANGE.startISO,
+                                              LAST_DATE_RANGE.endISO);
+    convs = window.INSIGHTS.conversations
+      .filter(c => inDate(c.lastActivity || c.firstActivity || ""))
+      .slice()
+      .sort((a, b) => (b.cost || 0) - (a.cost || 0))
+      .slice(0, 9);
+  } else {
+    convs = sessionData;
+  }
+  sbody.innerHTML = '';
+  for (const c of convs) {
+    const cacheRead   = c.cacheRead   ?? 0;
+    const cacheCreate = c.cacheCreate ?? 0;
+    const denom = cacheRead + cacheCreate;
+    const hit = denom > 0 ? (cacheRead / denom * 100).toFixed(1) : '0.0';
+    const sourceLabel = (c.source || "").toUpperCase() === "CLI" ? "CLI" : "Cowork";
+    const badgeClass = sourceLabel === 'CLI' ? 'cli' : 'cowork';
+    const sessionLabel = c.session ?? c.name ?? (c.sessionId || "").slice(0, 12);
+    const modelsLabel  = c.models ?? (c.model || "").replace("claude-", "").replace(/-\d{8}$/, "");
+    const totalTokens  = c.total ?? c.totalTokens ?? 0;
+    sbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${U.esc(sessionLabel)}</td>
+        <td><span class="badge ${badgeClass}">${U.esc(sourceLabel)}</span></td>
+        <td style="color: var(--muted);">${U.esc(modelsLabel)}</td>
+        <td class="num">${fmtT(totalTokens)}</td>
+        <td class="num" style="color: var(--green);">${hit}%</td>
+        <td class="num">${fmtMoney(c.cost || 0)}</td>
+      </tr>
+    `);
+  }
+}
+renderSessionTable();
+
+function renderTimeSeriesCharts() {
+  const labels = dailyData.map(d => d.date);
+  const sums = sumDaily(dailyData);
+
+  const segBorder = getComputedStyle(document.documentElement)
+    .getPropertyValue('--card').trim() || '#1a2028';
+
+  makeChart('costChart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'CLI',    data: dailyData.map(d => d.cliCost),    backgroundColor: '#60a5fa', borderRadius: 4, stack: 'cost' },
+        { label: 'Cowork', data: dailyData.map(d => d.coworkCost), backgroundColor: '#f472b6', borderRadius: 4, stack: 'cost' },
+      ]
+    },
+    options: { ...chartOpts,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${Currency.format(ctx.parsed.y)}` } }
+      },
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { callback: v => Currency.format(v) } } }
+    }
+  });
+
+  makeChart('compositionChart', {
+    type: 'doughnut',
+    data: {
+      labels: ['Cache Read', 'Cache Create', 'Output', 'Input'],
+      datasets: [{
+        data: [sums.cacheRead, sums.cacheCreate, sums.output, sums.input],
+        backgroundColor: ['#4ade80', '#60a5fa', '#fbbf24', '#a78bfa'],
+        borderColor: segBorder, borderWidth: 2,
+      }]
+    },
+    options: { ...chartOpts,
+      plugins: { legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } } }
+    }
+  });
+
+  makeChart('tokensChart', {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Cache Read',   data: dailyData.map(d => d.cacheRead),   backgroundColor: '#4ade80' },
+      { label: 'Cache Create', data: dailyData.map(d => d.cacheCreate), backgroundColor: '#60a5fa' },
+      { label: 'Output',       data: dailyData.map(d => d.output),      backgroundColor: '#fbbf24' },
+      { label: 'Input',        data: dailyData.map(d => d.input),       backgroundColor: '#a78bfa' },
+    ]},
+    options: { ...chartOpts,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+      scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => (v / 1e6).toFixed(1) + 'M' } } }
+    }
+  });
+
+  makeChart('hitRatioChart', {
+    type: 'line',
+    data: { labels, datasets: [{
+      label: 'Cache Hit Ratio',
+      data: dailyData.map(d => {
+        const denom = d.cacheRead + d.cacheCreate;
+        return denom > 0 ? +(d.cacheRead / denom * 100).toFixed(2) : 0;
+      }),
+      borderColor: '#4ade80', backgroundColor: 'rgba(74, 222, 128, 0.15)',
+      fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#4ade80',
+    }]},
+    options: { ...chartOpts,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } } }
+    }
+  });
+}
+renderTimeSeriesCharts();
+
+function renderKPIs() {
+  const grid = document.getElementById('kpiGrid');
+  if (!grid) return;
+  const t = sumDaily(dailyData);
+  const sums = {
+    cost: t.cost, cli: t.cli, cw: t.cowork, tokens: t.total,
+    cr: t.cacheRead, cw2: t.cacheCreate, out: t.output, inp: t.input,
+  };
+  const days = t.days || 1;
+  const peak = t.peak;
+  const hitRatio = t.hitRatio * 100;
+  const fmtTk = n => n >= 1e6 ? (n/1e6).toFixed(2) + 'M' : n >= 1e3 ? (n/1e3).toFixed(1) + 'K' : (n||0).toString();
+  grid.innerHTML = `
+    <div class="card kpi"><div class="label">Total Cost</div>
+      <div class="value">${fmtMoney(sums.cost)}</div>
+      <div class="sub">${fmtMoney(sums.cli)} CLI + ${fmtMoney(sums.cw)} Cowork</div></div>
+    <div class="card kpi"><div class="label">Total Tokens</div>
+      <div class="value">${fmtTk(sums.tokens)}</div>
+      <div class="sub">${days} day${days===1?'':'s'} in range</div></div>
+    <div class="card kpi"><div class="label">Cache Hit Ratio</div>
+      <div class="value" style="color: var(--green);">${hitRatio.toFixed(2)}%</div>
+      <div class="ratio-bar"><div style="width: ${hitRatio}%"></div></div>
+      <div class="sub">cache_read / (cache_read + cache_create)</div></div>
+    <div class="card kpi"><div class="label">Cache Read Tokens</div>
+      <div class="value">${fmtTk(sums.cr)}</div>
+      <div class="sub">vs ${fmtTk(sums.cw2)} cache writes</div></div>
+    <div class="card kpi"><div class="label">Output Tokens</div>
+      <div class="value">${fmtTk(sums.out)}</div>
+      <div class="sub">vs ${fmtTk(sums.inp)} input</div></div>
+    <div class="card kpi"><div class="label">Avg Cost / Day</div>
+      <div class="value">${fmtMoney(sums.cost/days)}</div>
+      <div class="sub">${peak ? 'Peak: ' + fmtMoney(peak.cost) + ' on ' + peak.date : '—'}</div></div>
+  `;
+}
+renderKPIs();
+
+function renderModelChart() {
+  let labels = Object.keys(modelTotals);
+  let data   = Object.values(modelTotals).map(m => m.cost);
+  let scope  = "all-time, this machine";
+
+  if (window.INSIGHTS && Array.isArray(window.INSIGHTS.dailyTrend)) {
+    const inDate = (date) => DateFilter.inRange(date,
+                                                LAST_DATE_RANGE.startISO,
+                                                LAST_DATE_RANGE.endISO);
+    const agg = new Map();
+    let anyMatch = false;
+    for (const day of window.INSIGHTS.dailyTrend) {
+      if (!inDate(day.date)) continue;
+      anyMatch = true;
+      for (const [model, cost] of Object.entries(day.byModel || {})) {
+        const short = model.replace("claude-", "").replace(/-\d{8}$/, "");
+        agg.set(short, (agg.get(short) || 0) + (cost || 0));
+      }
+    }
+    if (anyMatch) {
+      const entries = [...agg.entries()].sort((a, b) => b[1] - a[1]);
+      labels = entries.map(e => e[0]);
+      data   = entries.map(e => +e[1].toFixed(4));
+      scope  = (LAST_DATE_RANGE.startISO && LAST_DATE_RANGE.endISO)
+        ? `${LAST_DATE_RANGE.startISO} → ${LAST_DATE_RANGE.endISO}, this machine`
+        : "all-time, this machine";
+    }
+  }
+
+  let cap = document.getElementById("modelChartCaption");
+  if (!cap) {
+    cap = document.createElement("div");
+    cap.id = "modelChartCaption";
+    cap.style.cssText = "color: var(--muted); font-size: 11px; margin-top: 4px;";
+    const card = document.getElementById("modelChart").closest(".card");
+    if (card) card.appendChild(cap);
+  }
+  cap.textContent = `Scope: ${scope}`;
+
+  makeChart('modelChart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Cost',
+        data,
+        backgroundColor: (U && U.PALETTE) || ['#a78bfa', '#d97757', '#60a5fa', '#fbbf24', '#f472b6', '#4ade80'],
+        borderRadius: 4,
+      }]
+    },
+    options: { ...chartOpts,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => Currency.format(ctx.parsed.x) } }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { callback: v => Currency.format(v) } }
+      }
+    }
+  });
+}
+renderModelChart();
+
+const mpBody = document.getElementById('modelPricingBody');
+const mpFoot = document.getElementById('modelPricingFoot');
+const totals = { input: 0, output: 0, cw: 0, cr: 0, std: 0, batch: 0, nocache: 0, saved: 0 };
+modelPricing.forEach(p => {
+  const d = pricingDerivedRow(p);
+  totals.input += p.input; totals.output += p.output;
+  totals.cw += p.cacheWrite; totals.cr += p.cacheRead;
+  totals.std += p.standard; totals.batch += d.batch;
+  totals.nocache += d.noCacheCost; totals.saved += d.cacheSaved;
+  const savedPct = (d.cacheSaved / d.noCacheCost * 100).toFixed(1);
+  mpBody.insertAdjacentHTML('beforeend', `
+    <tr>
+      <td><strong>${p.model}</strong></td>
+      <td class="num">${fmt(p.input)}</td>
+      <td class="num">${fmt(p.output)}</td>
+      <td class="num">${fmt(p.cacheWrite)}</td>
+      <td class="num">${fmt(p.cacheRead)}</td>
+      <td class="num">${fmtMoney(p.standard)}</td>
+      <td class="num" style="color: var(--green);">${fmtMoney(d.batch)}</td>
+      <td class="num" style="color: var(--amber);">${fmtMoney(d.noCacheCost)}</td>
+      <td class="num" style="color: var(--green);">−${fmtMoney(d.cacheSaved)} <span style="color: var(--muted); font-size: 11px;">(${savedPct}%)</span></td>
+    </tr>
+  `);
+});
+const totalSavedPct = (totals.saved / totals.nocache * 100).toFixed(1);
+mpFoot.innerHTML = `
+  <tr style="font-weight: 600;">
+    <td>Total</td>
+    <td class="num">${fmt(totals.input)}</td>
+    <td class="num">${fmt(totals.output)}</td>
+    <td class="num">${fmt(totals.cw)}</td>
+    <td class="num">${fmt(totals.cr)}</td>
+    <td class="num">${fmtMoney(totals.std)}</td>
+    <td class="num" style="color: var(--green);">${fmtMoney(totals.batch)}</td>
+    <td class="num" style="color: var(--amber);">${fmtMoney(totals.nocache)}</td>
+    <td class="num" style="color: var(--green);">−${fmtMoney(totals.saved)} <span style="color: var(--muted); font-size: 11px;">(${totalSavedPct}%)</span></td>
+  </tr>
+`;
+
+const tierLabels = modelPricing.map(p => p.model);
+const tierStandard = modelPricing.map(p => p.standard);
+const tierBatch = modelPricing.map(p => p.standard * 0.5);
+const tierNoCache = modelPricing.map(p => pricingDerivedRow(p).noCacheCost);
+makeChart('tierChart', {
+  type: 'bar',
+  data: {
+    labels: tierLabels,
+    datasets: [
+      { label: 'No-Cache (hypothetical)', data: tierNoCache,  backgroundColor: '#fbbf24' },
+      { label: 'Standard (actual)',       data: tierStandard, backgroundColor: '#60a5fa' },
+      { label: 'Batch (50% off)',         data: tierBatch,    backgroundColor: '#4ade80' },
+    ]
+  },
+  options: { ...chartOpts,
+    plugins: {
+      legend: { position: 'bottom', labels: { font: { size: 11 } } },
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + Currency.format(ctx.parsed.y) } }
+    },
+    scales: {
+      y: { beginAtZero: true, ticks: { callback: v => Currency.format(v) } }
+    }
+  }
+});
+
+makeChart('cacheSavingsChart', {
+  type: 'bar',
+  data: {
+    labels: tierLabels,
+    datasets: [
+      { label: 'Actually paid (Standard)',     data: tierStandard, backgroundColor: '#60a5fa', stack: 's' },
+      { label: 'Saved by prompt caching',      data: modelPricing.map(p => pricingDerivedRow(p).cacheSaved), backgroundColor: '#4ade80', stack: 's' },
+    ]
+  },
+  options: { ...chartOpts,
+    indexAxis: 'y',
+    plugins: {
+      legend: { position: 'bottom', labels: { font: { size: 11 } } },
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + Currency.format(ctx.parsed.x) } }
+    },
+    scales: {
+      x: { stacked: true, ticks: { callback: v => Currency.format(v) } },
+      y: { stacked: true }
+    }
+  }
+});
+
+function renderSourceChart() {
+  const t = sumDaily(dailyData);
+  const segBorder = getComputedStyle(document.documentElement)
+    .getPropertyValue('--card').trim() || '#1a2028';
+  makeChart('sourceChart', {
+    type: 'doughnut',
+    data: {
+      labels: ['CLI', 'Cowork (desktop)'],
+      datasets: [{
+        data: [+t.cli.toFixed(4), +t.cowork.toFixed(4)],
+        backgroundColor: ['#60a5fa', '#f472b6'],
+        borderColor: segBorder, borderWidth: 2,
+      }]
+    },
+    options: { ...chartOpts,
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + Currency.format(ctx.parsed) } }
+      }
+    }
+  });
+}
+renderSourceChart();
+
+// Wire up machine/source/project selects (populated after DateFilter.mount in section 6)
+let PROJECT_TOTALS_BY_SOURCE = [];
+
+function rebuildMachineOptions() {
+  const machineSel = document.getElementById("dashMachine");
+  if (!machineSel) return;
+  const previous = machineSel.value;
+  machineSel.innerHTML = '<option value="all">All machines</option>';
+  if (!MACHINES_DAILY) return;
+  const hosts = Object.keys(MACHINES_DAILY).sort();
+  for (const h of hosts) {
+    const total = MACHINES_DAILY[h].reduce((s, r) => s + (r.cost || 0), 0);
+    const opt = document.createElement("option");
+    opt.value = h;
+    opt.textContent = `${h} (${Currency.format(total, { decimals: 0 })})`;
+    machineSel.appendChild(opt);
+  }
+  const stillThere = Array.from(machineSel.options).some(o => o.value === previous);
+  machineSel.value = stillThere ? previous : "all";
+  if (!stillThere) CURRENT_MACHINE = "all";
+}
+
+function rebuildAllDaily() {
+  if (!MACHINES_DAILY || Object.keys(MACHINES_DAILY).length === 0) {
+    ALL_DAILY = LOCAL_DAILY.slice();
+    return;
+  }
+  if (CURRENT_MACHINE === "all") {
+    ALL_DAILY = mergeMachines(MACHINES_DAILY);
+  } else {
+    ALL_DAILY = (MACHINES_DAILY[CURRENT_MACHINE] || []).slice();
+  }
+}
+
+function loadAllMachineSnapshots() {
+  function consume() {
+    const am = window.ALL_MACHINES;
+    if (!am || typeof am !== "object" || !Object.keys(am).length) return;
+    const out = {};
+    for (const [host, snap] of Object.entries(am)) {
+      out[host] = reshapeMachine(snap);
+    }
+    if (!Object.keys(out).length) return;
+    MACHINES_DAILY = out;
+    rebuildMachineOptions();
+    rebuildAllDaily();
+    applyAllFilters();
+  }
+  if (window.ALL_MACHINES) { consume(); return; }
+  const s = document.createElement("script");
+  s.src = "machines/all_machines.js"; s.async = true;
+  s.onload  = consume;
+  s.onerror = () => s.remove();
+  document.head.appendChild(s);
+}
+loadAllMachineSnapshots();
+
+function rebuildProjectOptions() {
+  const projectSel = document.getElementById("dashProject");
+  const sourceSel  = document.getElementById("dashSource");
+  if (!projectSel) return;
+  const filtered = PROJECT_TOTALS_BY_SOURCE.filter(p => {
+    if (CURRENT_SOURCE === "cli")    return p.cli    > 0;
+    if (CURRENT_SOURCE === "cowork") return p.cowork > 0;
+    return p.total > 0;
+  });
+  const previousValue = projectSel.value;
+  projectSel.innerHTML = '<option value="all">All projects</option>';
+  for (const p of filtered) {
+    const cost = CURRENT_SOURCE === "cli" ? p.cli
+              : CURRENT_SOURCE === "cowork" ? p.cowork
+              : p.total;
+    const opt = document.createElement("option");
+    opt.value = p.name;
+    const wtBadge = p.worktreeCount > 0 ? ` +${p.worktreeCount}wt` : "";
+    opt.textContent = `${p.name} (${Currency.format(cost, { decimals: 0 })}${wtBadge})`;
+    projectSel.appendChild(opt);
+  }
+  const stillThere = Array.from(projectSel.options).some(o => o.value === previousValue);
+  projectSel.value = stillThere ? previousValue : "all";
+  if (!stillThere && CURRENT_PROJECT !== "all") {
+    CURRENT_PROJECT = "all";
+  }
+}
+
+// ── 4. Insights JS (Breakdown tab) ────────────────────────────────────────
+const COLORS   = ["#d97757", "#60a5fa", "#a78bfa", "#4ade80", "#fbbf24", "#f472b6", "#ef4444", "#94a3b8", "#06b6d4", "#84cc16"];
+
+const CAT_COLORS = {
+  builtin:  "#60a5fa",
+  mcp:      "#f472b6",
+  plugin:   "#d97757",
+  subagent: "#a78bfa",
+  unknown:  "#8a93a3",
+};
+
+let TREND_CHART = null;
+let TREND_DATA = null;
+
+function paintTrend(tab) {
+  if (!TREND_DATA) return;
+  const dim = tab || "byProject";
+  const days = TREND_DATA.map(d => d.date);
+  const seriesMap = new Map();
+  TREND_DATA.forEach(d => {
+    Object.keys(d[dim] || {}).forEach(k => seriesMap.set(k, true));
+  });
+  const allKeys = Array.from(seriesMap.keys());
+  const totalByKey = {};
+  allKeys.forEach(k => {
+    totalByKey[k] = TREND_DATA.reduce((s, d) => s + ((d[dim] || {})[k] || 0), 0);
+  });
+  allKeys.sort((a, b) => totalByKey[b] - totalByKey[a]);
+  const palette = ["#d97757", "#60a5fa", "#a78bfa", "#4ade80", "#fbbf24", "#f472b6", "#ef4444", "#06b6d4", "#84cc16", "#94a3b8"];
+  const datasets = allKeys.map((k, i) => ({
+    label: k.startsWith("claude-") ? k.replace("claude-", "").replace("-20251001", "") : k,
+    data: TREND_DATA.map(d => +((d[dim] || {})[k] || 0).toFixed(2)),
+    backgroundColor: k === "(Other)" ? "#475569" : palette[i % palette.length],
+    borderRadius: 2,
+  }));
+  if (TREND_CHART) TREND_CHART.destroy();
+  TREND_CHART = new Chart(document.getElementById("trendChart"), {
+    type: "bar",
+    data: { labels: days, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom", labels: { font: { size: 11 } } },
+        tooltip: { mode: "index", intersect: false, callbacks: {
+          label: ctx => `${ctx.dataset.label}: ${Currency.format(ctx.parsed.y)}`,
+          footer: items => `Total: ${Currency.format(items.reduce((s, x) => s + x.parsed.y, 0))}`,
+        }}
+      },
+      scales: {
+        x: { stacked: true },
+        y: { stacked: true, beginAtZero: true, ticks: { callback: v => Currency.format(v) } }
+      }
+    }
+  });
+  document.querySelectorAll(".trend-tab").forEach(btn =>
+    btn.classList.toggle("active", btn.dataset.tab === dim)
+  );
+}
+
+document.querySelectorAll(".trend-tab").forEach(btn => {
+  btn.addEventListener("click", () => paintTrend(btn.dataset.tab));
+});
+
+let RAW = null;
+
+function applyFilter(rangeKey, startISO, endISO) {
+  if (!RAW) return;
+  let filteredTrend = (RAW.dailyTrend || []).filter(d => DateFilter.inRange(d.date, startISO, endISO));
+
+  // Source filter: remap each day's projectsDetail to the selected source's costs only
+  if (CURRENT_SOURCE === 'cli' || CURRENT_SOURCE === 'cowork') {
+    const src = CURRENT_SOURCE;
+    filteredTrend = filteredTrend.map(day => {
+      const projDetail = {};
+      for (const [name, pd] of Object.entries(day.projectsDetail || {})) {
+        const srcCost = (src === 'cli' ? pd.cliCost : pd.coworkCost) || 0;
+        if (srcCost <= 0) continue;
+        const scale = pd.cost > 0 ? srcCost / pd.cost : 0;
+        projDetail[name] = {
+          cost: srcCost,
+          cliCost:     src === 'cli'    ? srcCost : 0,
+          coworkCost:  src === 'cowork' ? srcCost : 0,
+          input:       Math.round((pd.input       || 0) * scale),
+          output:      Math.round((pd.output      || 0) * scale),
+          cacheCreate: Math.round((pd.cacheCreate || 0) * scale),
+          cacheRead:   Math.round((pd.cacheRead   || 0) * scale),
+          turns:       Math.round((pd.turns       || 0) * scale),
+        };
+      }
+      const newCost = Object.values(projDetail).reduce((s, p) => s + p.cost, 0);
+      const sd = (day.sourceDetail || {})[src] || {};
+      return { ...day, projectsDetail: projDetail, cost: newCost,
+               sourceDetail: { [src]: { cost: newCost, turns: sd.turns || 0 } } };
+    }).filter(day => day.cost > 0);
+  }
+
+  // Project filter: restrict to selected project only
+  if (CURRENT_PROJECT !== 'all') {
+    filteredTrend = filteredTrend.map(day => {
+      const projDetail = {};
+      let cost = 0, cliCost = 0, coworkCost = 0;
+      for (const [name, pd] of Object.entries(day.projectsDetail || {})) {
+        if (!projectMatchesFilter(name, CURRENT_PROJECT)) continue;
+        projDetail[name] = pd;
+        cost       += pd.cost       || 0;
+        cliCost    += pd.cliCost    || 0;
+        coworkCost += pd.coworkCost || 0;
+      }
+      return { ...day, projectsDetail: projDetail, cost,
+               sourceDetail: { cli: { cost: cliCost }, cowork: { cost: coworkCost } } };
+    }).filter(day => day.cost > 0);
+  }
+
+  TREND_DATA = filteredTrend;
+  const agg = aggregateFromTrend(filteredTrend);
+  const filteredConvs = (RAW.conversations || []).filter(c => {
+    if (!startISO && !endISO) return true;
+    const start = (c.earliest || "").slice(0, 10);
+    const end   = (c.latest   || "").slice(0, 10);
+    if (!start && !end) return false;
+    if (startISO && end && end < startISO) return false;
+    if (endISO   && start && start > endISO) return false;
+    return true;
+  });
+  const hasSecondaryFilter = CURRENT_PROJECT !== 'all' || CURRENT_SOURCE !== 'all';
+  const useFull = !startISO && !endISO && !hasSecondaryFilter;
+  const payload = useFull
+    ? { ...RAW, dailyTrend: filteredTrend, conversations: filteredConvs }
+    : { ...RAW, ...agg, conversations: filteredConvs, dailyTrend: filteredTrend, _filtered: true, _rangeKey: rangeKey, _startISO: startISO, _endISO: endISO };
+  render(payload);
+}
+
+const RATES = {
+  opus:   { input: 5.0,  output: 25.0, cache_write: 6.25, cache_read: 0.50 },
+  sonnet: { input: 3.0,  output: 15.0, cache_write: 3.75, cache_read: 0.30 },
+  haiku:  { input: 1.0,  output: 5.0,  cache_write: 1.25, cache_read: 0.10 },
+};
+function modelFamily(name) {
+  const n = (name || "").toLowerCase();
+  if (n.includes("opus"))   return "opus";
+  if (n.includes("sonnet")) return "sonnet";
+  if (n.includes("haiku"))  return "haiku";
+  return "sonnet";
+}
+
+function aggregateFromTrend(trend) {
+  const richSum = (key) => {
+    const out = {};
+    trend.forEach(d => Object.entries(d[key] || {}).forEach(([k, v]) => {
+      const acc = out[k] || (out[k] = { cost:0, input:0, output:0, cacheCreate:0, cacheRead:0, turns:0, cliCost:0, coworkCost:0 });
+      acc.cost        += v.cost || 0;
+      acc.input       += v.input || 0;
+      acc.output      += v.output || 0;
+      acc.cacheCreate += v.cacheCreate || 0;
+      acc.cacheRead   += v.cacheRead || 0;
+      acc.turns       += v.turns || 0;
+      acc.cliCost     += v.cliCost || 0;
+      acc.coworkCost  += v.coworkCost || 0;
+    }));
+    return out;
+  };
+  const sumDim = (key) => {
+    const out = {};
+    trend.forEach(d => Object.entries(d[key] || {}).forEach(([k, v]) => { out[k] = (out[k] || 0) + v; }));
+    return out;
+  };
+
+  const projDetail   = richSum("projectsDetail");
+  const sourceDetail = richSum("sourceDetail");
+  const modelDetail  = richSum("modelDetail");
+  const byToolMap    = sumDim("byTool");
+  const byMCPMap     = sumDim("byMCPServer");
+  const byCategory   = sumDim("byCategory");
+
+  const totals = trend.reduce((s, d) => ({
+    cost: s.cost + (d.cost || 0),
+    turns: s.turns + (d.turns || 0),
+    input: s.input + (d.input || 0),
+    output: s.output + (d.output || 0),
+    cacheCreate: s.cacheCreate + (d.cacheCreate || 0),
+    cacheRead: s.cacheRead + (d.cacheRead || 0),
+  }), { cost:0, turns:0, input:0, output:0, cacheCreate:0, cacheRead:0 });
+
+  const byProject = Object.entries(projDetail).map(([name, v]) => ({
+    name, cwd: (RAW.byProject || []).find(p => p.name === name)?.cwd || "",
+    cost: +v.cost.toFixed(4),
+    cliCost: +v.cliCost.toFixed(4), coworkCost: +v.coworkCost.toFixed(4),
+    input: v.input, output: v.output, cacheCreate: v.cacheCreate, cacheRead: v.cacheRead,
+    turns: v.turns, models: {}, topTools: [],
+    cacheHitRatio: (v.cacheRead + v.cacheCreate) > 0 ? +(v.cacheRead / (v.cacheRead + v.cacheCreate)).toFixed(4) : 0,
+  })).sort((a, b) => b.cost - a.cost);
+  const rawProjLookup = Object.fromEntries((RAW.byProject || []).map(p => [p.name, p]));
+  byProject.forEach(p => {
+    p.topTools = (rawProjLookup[p.name]?.topTools || []).slice(0, 8);
+    p.models = rawProjLookup[p.name]?.models || {};
+  });
+
+  const catLookup = Object.fromEntries((RAW.byTool || []).map(t => [t.name, t.category]));
+  const invLookup = Object.fromEntries((RAW.byTool || []).map(t => [t.name, t.invocations]));
+  const rawCostLookup = Object.fromEntries((RAW.byTool || []).map(t => [t.name, t.approxCost]));
+  const byTool = Object.entries(byToolMap).map(([name, cost]) => ({
+    name, category: catLookup[name] || "unknown", subcategory: "",
+    invocations: rawCostLookup[name] > 0 ? Math.round((invLookup[name] || 0) * (cost / rawCostLookup[name])) : 0,
+    turns: 0, approxCost: +cost.toFixed(4), approxTokens: 0, projects: {},
+  })).sort((a, b) => b.approxCost - a.approxCost);
+
+  const byMCPServer = Object.entries(byMCPMap).map(([server, cost]) => {
+    const raw = (RAW.byMCPServer || []).find(m => m.server === server);
+    const rawCost = raw?.approxCost || 0;
+    return {
+      server, approxCost: +cost.toFixed(4),
+      invocations: rawCost > 0 ? Math.round((raw.invocations || 0) * (cost / rawCost)) : 0,
+      tools: raw?.tools || {}, topTools: raw?.topTools || [],
+    };
+  }).sort((a, b) => b.approxCost - a.approxCost);
+
+  const byModel = Object.entries(modelDetail).map(([model, v]) => {
+    const r = RATES[modelFamily(model)];
+    const noCacheCost = ((v.input + v.cacheRead + v.cacheCreate) * r.input + v.output * r.output) / 1e6;
+    const saved = noCacheCost - v.cost;
+    return {
+      model,
+      cost: +v.cost.toFixed(4),
+      input: v.input, output: v.output, cacheCreate: v.cacheCreate, cacheRead: v.cacheRead,
+      turns: v.turns,
+      noCacheCost: +noCacheCost.toFixed(4),
+      cacheSaved:  +saved.toFixed(4),
+      cacheSavedPct: noCacheCost > 0 ? +(saved / noCacheCost * 100).toFixed(1) : 0,
+    };
+  }).sort((a, b) => b.cost - a.cost);
+
+  const bySource = {
+    cli:    {
+      cost: +(sourceDetail.cli?.cost || 0).toFixed(4), turns: sourceDetail.cli?.turns || 0,
+      input: sourceDetail.cli?.input || 0, output: sourceDetail.cli?.output || 0,
+      cacheCreate: sourceDetail.cli?.cacheCreate || 0, cacheRead: sourceDetail.cli?.cacheRead || 0,
+    },
+    cowork: {
+      cost: +(sourceDetail.cowork?.cost || 0).toFixed(4), turns: sourceDetail.cowork?.turns || 0,
+      input: sourceDetail.cowork?.input || 0, output: sourceDetail.cowork?.output || 0,
+      cacheCreate: sourceDetail.cowork?.cacheCreate || 0, cacheRead: sourceDetail.cowork?.cacheRead || 0,
+    },
+  };
+
+  return { totals, byProject, byTool, byMCPServer, byModel, bySource, byCategory };
+}
+
+function render(d) {
+  ["projectChart", "sourceProjectChart", "toolChart", "categoryChart", "subagentChart", "pluginChart"].forEach(id => {
+    const c = Chart.getChart(id);
+    if (c) c.destroy();
+  });
+
+  const total = d.totals;
+  TREND_DATA = d.dailyTrend || TREND_DATA;
+  paintTrend(document.querySelector(".trend-tab.active")?.dataset.tab || "byProject");
+  document.getElementById("subtitle").textContent =
+    `Generated ${d.generatedAt} · ${d.filesScanned} files · ${total.turns.toLocaleString()} turns · ${(total.cacheRead/1e6).toFixed(1)}M cache reads`;
+
+  const headlineList = document.getElementById("headlineList");
+  if (headlineList) {
+    const lines = [];
+    const totalCost = total.cost || 0;
+    const top = d.byProject[0];
+    if (top && totalCost > 0) {
+      const share = (top.cost / totalCost * 100).toFixed(0);
+      lines.push(`<strong>${U.esc(top.name)}</strong> dominates spend at <em>${share}%</em> (${fmtMoney(top.cost)} of ${fmtMoney(totalCost)}).`);
+    }
+    const worstCache = d.byProject
+      .filter(p => p.turns >= 10 && p.cost > 1)
+      .reduce((m, p) => ((p.cacheHitRatio < (m?.cacheHitRatio ?? 1)) ? p : m), null);
+    if (worstCache && worstCache.cacheHitRatio < 0.7) {
+      lines.push(`Lowest cache hit on <strong>${U.esc(worstCache.name)}</strong> at <em>${(worstCache.cacheHitRatio * 100).toFixed(0)}%</em> — likely re-reading context every turn.`);
+    }
+    const bestCache = d.byProject
+      .filter(p => p.turns >= 10)
+      .reduce((m, p) => ((p.cacheHitRatio > (m?.cacheHitRatio ?? 0)) ? p : m), null);
+    if (bestCache) {
+      lines.push(`Best cache reuse: <strong>${U.esc(bestCache.name)}</strong> at <em>${(bestCache.cacheHitRatio * 100).toFixed(0)}%</em>.`);
+    }
+    const topMCP = d.byMCPServer[0];
+    if (topMCP && topMCP.invocations > 50) {
+      lines.push(`Heaviest MCP server: <strong>${U.esc(topMCP.server)}</strong> with <em>${topMCP.invocations.toLocaleString()}</em> calls (${fmtMoney(topMCP.approxCost)}).`);
+    }
+    const cliPct = totalCost > 0 ? (d.bySource.cli.cost / totalCost * 100) : 0;
+    if (cliPct >= 80 || cliPct <= 20) {
+      const dominant = cliPct >= 80 ? "CLI" : "Cowork";
+      const pct = cliPct >= 80 ? cliPct : (100 - cliPct);
+      lines.push(`Source skew: <strong>${dominant}</strong> drives <em>${pct.toFixed(0)}%</em> of cost on this machine.`);
+    }
+    const totalConvs = (d.conversations || []).length;
+    const longest = (d.conversations || []).reduce((m, c) => ((c.turns || 0) > (m?.turns || 0) ? c : m), null);
+    if (longest && longest.turns >= 200) {
+      lines.push(`Longest session: <strong>${U.esc(longest.name || "—")}</strong> ran <em>${longest.turns.toLocaleString()}</em> turns (${fmtMoney(longest.cost)}, across ${totalConvs} sessions total).`);
+    }
+    headlineList.innerHTML = lines.length
+      ? lines.map(l => `<li>${l}</li>`).join("")
+      : `<li style="color: var(--muted);">No data yet. Run <code>bash update_usage.sh</code> to populate.</li>`;
+  }
+
+  document.getElementById("kpis").innerHTML = `
+    <div class="card kpi" style="margin:0;">
+      <div class="label">Total API-Equivalent Cost</div>
+      <div class="value">${fmtMoney(total.cost)}</div>
+      <div class="sub">${total.turns.toLocaleString()} assistant turns</div>
+    </div>
+    <div class="card kpi" style="margin:0;">
+      <div class="label">Top Project</div>
+      <div class="value">${d.byProject[0].name}</div>
+      <div class="sub">${fmtMoney(d.byProject[0].cost)} (${(d.byProject[0].cost/total.cost*100).toFixed(0)}% of spend)</div>
+    </div>
+    <div class="card kpi" style="margin:0;">
+      <div class="label">Top Tool by Cost</div>
+      <div class="value">${d.byTool[0].name.length > 25 ? d.byTool[0].name.slice(0, 22) + '…' : d.byTool[0].name}</div>
+      <div class="sub">${d.byTool[0].invocations} calls · ${fmtMoney(d.byTool[0].approxCost)}</div>
+    </div>
+    <div class="card kpi" style="margin:0;">
+      <div class="label">Top MCP Server</div>
+      <div class="value">${d.byMCPServer[0]?.server || "—"}</div>
+      <div class="sub">${d.byMCPServer[0] ? d.byMCPServer[0].invocations + ' calls · ' + fmtMoney(d.byMCPServer[0].approxCost) : ''}</div>
+    </div>
+    <div class="card kpi" style="margin:0;">
+      <div class="label">CLI vs Cowork</div>
+      <div class="value">${(d.bySource.cli.cost / total.cost * 100).toFixed(0)}% / ${(d.bySource.cowork.cost / total.cost * 100).toFixed(0)}%</div>
+      <div class="sub">${fmtMoney(d.bySource.cli.cost)} CLI · ${fmtMoney(d.bySource.cowork.cost)} Cowork</div>
+    </div>
+    <div class="card kpi" style="margin:0;">
+      <div class="label">Cache Hit Ratio (overall)</div>
+      <div class="value" style="color: var(--green);">${(total.cacheRead / (total.cacheRead + total.cacheCreate) * 100).toFixed(1)}%</div>
+      <div class="sub">${fmtTok(total.cacheRead)} reads / ${fmtTok(total.cacheCreate)} writes</div>
+    </div>
+  `;
+
+  const topProjects = d.byProject.slice(0, 8);
+  new Chart(document.getElementById("projectChart"), {
+    type: "bar",
+    data: {
+      labels: topProjects.map(p => p.name),
+      datasets: [{ data: topProjects.map(p => +p.cost.toFixed(2)), backgroundColor: COLORS, borderRadius: 4 }],
+    },
+    options: {
+      indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtMoney(ctx.parsed.x) } } },
+      scales: { x: { beginAtZero: true, ticks: { callback: v => Currency.format(v) } } }
+    }
+  });
+
+  new Chart(document.getElementById("sourceProjectChart"), {
+    type: "bar",
+    data: {
+      labels: topProjects.map(p => p.name),
+      datasets: [
+        { label: "CLI",    data: topProjects.map(p => +p.cliCost.toFixed(2)),    backgroundColor: "#60a5fa" },
+        { label: "Cowork", data: topProjects.map(p => +p.coworkCost.toFixed(2)), backgroundColor: "#f472b6" },
+      ]
+    },
+    options: {
+      indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { font: { size: 11 } } } },
+      scales: { x: { stacked: true, beginAtZero: true, ticks: { callback: v => Currency.format(v) } }, y: { stacked: true } }
+    }
+  });
+
+  function renderProjects() {
+    const search = (document.getElementById("projectSearch")?.value || "").toLowerCase().trim();
+    const showAll = document.getElementById("projectShowAll")?.checked;
+    let rows = d.byProject;
+    if (search) rows = rows.filter(p => (p.name || "").toLowerCase().includes(search));
+    const truncated = !showAll && rows.length > 10;
+    if (truncated) rows = rows.slice(0, 10);
+    document.getElementById("projectsBody").innerHTML = rows.map(p => {
+      const tools = (p.topTools || []).slice(0, 4).map(t => {
+        const short = t.name.length > 28 ? t.name.slice(0, 25) + "…" : t.name;
+        return `<span style="color: var(--muted); font-size: 11px; margin-right: 8px;">${U.esc(short)} (${t.count})</span>`;
+      }).join("");
+      const cwd = p.cwd ? `<div style="color: var(--muted); font-size: 11px;">${U.esc(p.cwd)}</div>` : "";
+      const hitColor = p.cacheHitRatio > 0.85 ? "var(--green)" : p.cacheHitRatio > 0.5 ? "var(--amber)" : "var(--red)";
+      return `<tr>
+        <td><strong>${U.esc(p.name)}</strong>${cwd}</td>
+        <td class="num">${fmtMoney(p.cost)}</td>
+        <td class="num"><span class="pill pill-cli">${fmtMoney(p.cliCost)}</span> / <span class="pill pill-cowork">${fmtMoney(p.coworkCost)}</span></td>
+        <td class="num">${fmtTok(p.input + p.output + p.cacheCreate + p.cacheRead)}</td>
+        <td class="num" style="color:${hitColor};">${(p.cacheHitRatio * 100).toFixed(0)}%</td>
+        <td class="num">${p.turns}</td>
+        <td>${tools}</td>
+      </tr>`;
+    }).join("") + (truncated
+      ? `<tr><td colspan="7" style="text-align:center; color:var(--muted); font-size:12px;">+ ${d.byProject.length - 10} more — toggle "show all"</td></tr>`
+      : "");
+  }
+  renderProjects();
+  document.getElementById("projectSearch")?.addEventListener("input", renderProjects);
+  document.getElementById("projectShowAll")?.addEventListener("change", renderProjects);
+
+  const topTools = d.byTool.slice(0, 12);
+  new Chart(document.getElementById("toolChart"), {
+    type: "bar",
+    data: {
+      labels: topTools.map(t => t.name.length > 35 ? t.name.slice(0, 32) + "…" : t.name),
+      datasets: [{
+        data: topTools.map(t => +t.approxCost.toFixed(2)),
+        backgroundColor: topTools.map(t => CAT_COLORS[t.category] || "#8a93a3"),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtMoney(ctx.parsed.x) + " · " + topTools[ctx.dataIndex].invocations + " calls" } } },
+      scales: { x: { beginAtZero: true, ticks: { callback: v => Currency.format(v) } } }
+    }
+  });
+
+  const byCategory = {};
+  d.byTool.forEach(t => { byCategory[t.category] = (byCategory[t.category] || 0) + t.approxCost; });
+  new Chart(document.getElementById("categoryChart"), {
+    type: "doughnut",
+    data: {
+      labels: Object.keys(byCategory).map(k => k.charAt(0).toUpperCase() + k.slice(1)),
+      datasets: [{
+        data: Object.values(byCategory).map(v => +v.toFixed(2)),
+        backgroundColor: Object.keys(byCategory).map(k => CAT_COLORS[k]),
+        borderColor: "#1a2028", borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { padding: 12, font: { size: 11 } } },
+                 tooltip: { callbacks: { label: ctx => ctx.label + ": " + fmtMoney(ctx.parsed) } } }
+    }
+  });
+
+  const totalToolCost = d.byTool.reduce((s, t) => s + t.approxCost, 0);
+  function renderTools() {
+    const search = (document.getElementById("toolSearch")?.value || "").toLowerCase().trim();
+    const showAll = document.getElementById("toolShowAll")?.checked;
+    let rows = d.byTool;
+    if (search) rows = rows.filter(t => (t.name || "").toLowerCase().includes(search));
+    const truncated = !showAll && rows.length > 15;
+    if (truncated) rows = rows.slice(0, 15);
+    document.getElementById("toolsBody").innerHTML = rows.map(t => {
+      const pct = totalToolCost > 0 ? (t.approxCost / totalToolCost * 100) : 0;
+      const cat = U.esc(t.category);
+      return `<tr>
+        <td>${U.esc(t.name)}</td>
+        <td><span class="pill pill-${cat}">${cat}</span></td>
+        <td class="num">${t.invocations}</td>
+        <td class="num">${fmtMoney(t.approxCost)}</td>
+        <td class="num">${fmtTok(t.approxTokens)}</td>
+        <td><div class="bar-cell"><span style="min-width:42px;">${pct.toFixed(1)}%</span><div class="bar"><div style="width:${Math.min(100, pct * 5)}%; background:${CAT_COLORS[t.category]};"></div></div></div></td>
+      </tr>`;
+    }).join("") + (truncated
+      ? `<tr><td colspan="6" style="text-align:center; color:var(--muted); font-size:12px;">+ ${d.byTool.length - 15} more — toggle "show all"</td></tr>`
+      : "");
+  }
+  renderTools();
+  document.getElementById("toolSearch")?.addEventListener("input", renderTools);
+  document.getElementById("toolShowAll")?.addEventListener("change", renderTools);
+
+  const totalMCPCost = d.byMCPServer.reduce((s, m) => s + m.approxCost, 0);
+  document.getElementById("mcpBody").innerHTML = d.byMCPServer.map(m => {
+    const tools = (m.topTools || []).slice(0, 3).map(([n, c]) => `${U.esc(n)} (${c})`).join(", ");
+    const pct = totalMCPCost > 0 ? (m.approxCost / totalMCPCost * 100) : 0;
+    return `<tr>
+      <td><strong>${U.esc(m.server)}</strong></td>
+      <td class="num">${m.invocations}</td>
+      <td class="num">${fmtMoney(m.approxCost)}</td>
+      <td><div class="bar-cell"><span style="min-width:38px; font-size:11px;">${pct.toFixed(1)}%</span><div class="bar"><div style="width:${Math.min(100, pct)}%; background:${CAT_COLORS.mcp};"></div></div></div></td>
+      <td style="color:var(--muted); font-size: 11px;">${tools}</td>
+    </tr>`;
+  }).join("");
+
+  (function renderSubagentChart() {
+    const canvas = document.getElementById("subagentChart");
+    const empty = document.getElementById("subagentEmpty");
+    if (!canvas) return;
+    const sorted = (d.bySubagent || []).slice().sort((a, b) => a.approxCost - b.approxCost);
+    if (sorted.length === 0) {
+      canvas.style.display = "none";
+      if (empty) empty.style.display = "";
+      return;
+    }
+    if (empty) empty.style.display = "none";
+    canvas.style.display = "";
+    canvas.height = Math.max(120, sorted.length * 32);
+    new Chart(canvas, {
+      type: "bar",
+      data: {
+        labels: sorted.map(s => s.type),
+        datasets: [{
+          data: sorted.map(s => s.approxCost),
+          backgroundColor: CAT_COLORS.subagent,
+          borderRadius: 3,
+        }],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => `${fmtMoney(ctx.parsed.x)} · ${sorted[ctx.dataIndex].invocations} calls` } },
+        },
+        scales: {
+          x: { ticks: { callback: v => fmtMoney(v), font: { size: 11 } }, grid: { color: "rgba(128,128,128,0.1)" } },
+          y: { ticks: { font: { size: 11 } } },
+        },
+      },
+    });
+  })();
+
+  (function renderPluginChart() {
+    const section = document.getElementById("pluginSection");
+    const canvas = document.getElementById("pluginChart");
+    if (!canvas || !section) return;
+    const pluginMap = {};
+    (d.byTool || []).filter(t => t.category === "plugin").forEach(t => {
+      const m = t.name.match(/^mcp__plugin_(.+?)__/);
+      const server = m ? m[1] : t.name;
+      if (!pluginMap[server]) pluginMap[server] = { cost: 0, invocations: 0 };
+      pluginMap[server].cost += t.approxCost;
+      pluginMap[server].invocations += t.invocations;
+    });
+    const pluginData = Object.entries(pluginMap)
+      .map(([name, v]) => ({ name, cost: +v.cost.toFixed(4), invocations: v.invocations }))
+      .sort((a, b) => a.cost - b.cost);
+    if (pluginData.length === 0) {
+      section.innerHTML = `<p style="color:var(--muted); text-align:center; padding:24px 0; font-size:13px;">No plugin tool calls recorded.</p>`;
+      return;
+    }
+    canvas.height = Math.max(80, pluginData.length * 32);
+    new Chart(canvas, {
+      type: "bar",
+      data: {
+        labels: pluginData.map(p => p.name),
+        datasets: [{
+          data: pluginData.map(p => p.cost),
+          backgroundColor: CAT_COLORS.plugin,
+          borderRadius: 3,
+        }],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => `${fmtMoney(ctx.parsed.x)} · ${pluginData[ctx.dataIndex].invocations} calls` } },
+        },
+        scales: {
+          x: { ticks: { callback: v => fmtMoney(v), font: { size: 11 } }, grid: { color: "rgba(128,128,128,0.1)" } },
+          y: { ticks: { font: { size: 11 } } },
+        },
+      },
+    });
+  })();
+
+  document.getElementById("roiBody").innerHTML = d.byModel.map(m => {
+    const savedCls = m.cacheSavedPct > 70 ? "roi-positive" : m.cacheSavedPct > 40 ? "roi-warn" : "";
+    return `<tr>
+      <td><strong>${U.esc(m.model)}</strong></td>
+      <td class="num">${fmtTok(m.cacheRead)}</td>
+      <td class="num">${fmtTok(m.cacheCreate)}</td>
+      <td class="num">${fmtTok(m.output)}</td>
+      <td class="num">${fmtMoney(m.cost)}</td>
+      <td class="num" style="color: var(--amber);">${fmtMoney(m.noCacheCost)}</td>
+      <td class="num roi-positive">${fmtMoney(m.cacheSaved)}</td>
+      <td class="num ${savedCls}">${m.cacheSavedPct.toFixed(1)}%</td>
+    </tr>`;
+  }).join("");
+
+  const convs = (d.conversations || []).slice().sort((a, b) => b.cost - a.cost);
+  const convKPIs = document.getElementById("convKPIs");
+  const totalConvs = convs.length;
+  const totalTurns = convs.reduce((s, c) => s + (c.turns || 0), 0);
+  const totalTokens = convs.reduce((s, c) => s + (c.totalTokens || 0), 0);
+  const avgTurns = totalConvs > 0 ? Math.round(totalTurns / totalConvs) : 0;
+  const avgCtx = totalTurns > 0 ? Math.round((convs.reduce((s, c) => s + ((c.input || 0) + (c.cacheRead || 0)), 0)) / totalTurns) : 0;
+  const longest = convs.reduce((m, c) => ((c.turns || 0) > (m?.turns || 0) ? c : m), null);
+  if (convKPIs) {
+    convKPIs.innerHTML = `
+      <div class="card kpi" style="margin:0;"><div class="label">Conversations</div>
+        <div class="value">${totalConvs}</div>
+        <div class="sub">${totalTurns.toLocaleString()} turns total</div></div>
+      <div class="card kpi" style="margin:0;"><div class="label">Avg turns / conversation</div>
+        <div class="value">${avgTurns}</div>
+        <div class="sub">Longest: ${longest ? longest.turns + ' turns (' + U.esc(longest.name) + ')' : '—'}</div></div>
+      <div class="card kpi" style="margin:0;"><div class="label">Avg context size / turn</div>
+        <div class="value">${fmtTok(avgCtx)}</div>
+        <div class="sub">input + cache_read per turn</div></div>
+      <div class="card kpi" style="margin:0;"><div class="label">Tokens per conversation</div>
+        <div class="value">${fmtTok(totalConvs > 0 ? Math.round(totalTokens / totalConvs) : 0)}</div>
+        <div class="sub">avg across all sessions</div></div>
+    `;
+  }
+  const convBody = document.getElementById("conversationsBody");
+  if (convBody) {
+    if (convs.length === 0) {
+      convBody.innerHTML = `<tr><td colspan="8" style="color:var(--muted); text-align:center;">No conversations in selected range.</td></tr>`;
+    } else {
+      convBody.innerHTML = convs.map(c => {
+        const hit = c.cacheHitRatio * 100;
+        const hitColor = hit > 85 ? "var(--green)" : hit > 50 ? "var(--amber)" : "var(--red)";
+        const dur = c.durationMinutes < 60
+          ? `${c.durationMinutes.toFixed(0)}m`
+          : c.durationMinutes < 1440
+            ? `${(c.durationMinutes/60).toFixed(1)}h`
+            : `${(c.durationMinutes/1440).toFixed(1)}d`;
+        const sid = (c.sessionId || "").slice(0, 8);
+        const src = U.esc(c.source);
+        return `<tr>
+          <td><strong>${U.esc(c.name || '—')}</strong>
+              <div style="color: var(--muted); font-size: 11px;">${U.esc(sid)}…</div></td>
+          <td><span class="pill pill-${src}">${src}</span></td>
+          <td class="num">${c.turns}</td>
+          <td class="num">${fmtTok(c.totalTokens)}</td>
+          <td class="num">${fmtTok(c.avgContextPerTurn)}</td>
+          <td class="num" style="color:${hitColor};">${hit.toFixed(0)}%</td>
+          <td class="num" style="color: var(--muted);">${dur}</td>
+          <td class="num">${fmtMoney(c.cost)}</td>
+        </tr>`;
+      }).join("");
+    }
+  }
+
+  document.getElementById("sourcesBody").innerHTML = `
+    <tr><td><span class="pill pill-cli">CLI</span> ${getEnv()}\\.claude\\projects</td><td class="num">${fmtMoney(d.bySource.cli.cost)}</td><td class="num">${d.bySource.cli.turns}</td><td class="num">${fmtTok(d.bySource.cli.cacheRead)}</td><td>Local Claude Code CLI sessions on this machine.</td></tr>
+    <tr><td><span class="pill pill-cowork">Cowork</span> %APPDATA%\\Claude\\local-agent-mode-sessions</td><td class="num">${fmtMoney(d.bySource.cowork.cost)}</td><td class="num">${d.bySource.cowork.turns}</td><td class="num">${fmtTok(d.bySource.cowork.cacheRead)}</td><td>Claude Desktop cowork sessions on this machine.</td></tr>
+  `;
+}
+
+function getEnv() { return "%USERPROFILE%"; }
+
+function fallbackFetch() {
+  fetch("insights.json").then(r => r.json()).then(d => onLoaded(d)).catch(e => {
+    document.getElementById("subtitle").textContent = "Failed to load insights data — run build_insights.py first.";
+    console.error(e);
+  });
+}
+
+function onLoaded(d) {
+  RAW = d;
+  const dr = LAST_DATE_RANGE;
+  applyFilter(dr.key || "all", dr.startISO, dr.endISO);
+}
+
+function loadInsights() {
+  if (window.INSIGHTS) { onLoaded(window.INSIGHTS); return; }
+  const s = document.createElement("script");
+  s.src = "insights_data.js";
+  s.onload = () => {
+    if (window.INSIGHTS) onLoaded(window.INSIGHTS);
+    else fallbackFetch();
+  };
+  s.onerror = fallbackFetch;
+  document.head.appendChild(s);
+}
+loadInsights();
+
+// ── 5. Machine banner paint ───────────────────────────────────────────────
+(function () {
+  function paint(m) {
+    if (!m || !m.machines || !m.machines.length) return;
+    const totalCost = m.machines.reduce((s, x) => s + (x.totalCost || 0), 0);
+    const list = m.machines.map(x => `<span style="color: var(--text); margin-right:14px;">${U.esc(x.machine)} <span style="color:var(--muted);">(${fmtMoney(x.totalCost)})</span></span>`).join("");
+    document.getElementById("machineBanner").innerHTML = `
+      <div style="background: rgba(96, 165, 250, 0.08); border: 1px solid rgba(96, 165, 250, 0.3); border-radius: 8px; padding: 12px 16px; font-size: 13px;">
+        <strong style="color: #60a5fa;">Multi-machine sync:</strong>
+        <span style="color: var(--muted);">${m.machineCount} machine(s) — combined ${fmtMoney(totalCost)}.</span>
+        <div style="margin-top: 6px;">${list}</div>
+      </div>
+    `;
+  }
+  if (window.MACHINES_MANIFEST) { paint(window.MACHINES_MANIFEST); return; }
+  fetch("machines/manifest.json").then(r => r.ok ? r.json() : null).then(paint).catch(() => {});
+})();
+
+// ── 6. DateFilter mount (single, shared) ─────────────────────────────────
+const latestDate = ALL_DAILY.length ? ALL_DAILY[ALL_DAILY.length - 1].date : null;
+DateFilter.mount("dateFilter", {
+  storageKey: "ccusage.explore.range",
+  defaultKey: "all",
+  referenceDate: latestDate,
+  extras: `<span class="df-label">Machine</span>
+    <select id="dashMachine"><option value="all">All machines</option></select>
+    <span class="df-label">Source</span>
+    <select id="dashSource">
+      <option value="all">All</option>
+      <option value="cli">CLI only</option>
+      <option value="cowork">Cowork only</option>
+    </select>
+    <span class="df-label">Project</span>
+    <select id="dashProject"><option value="all">All projects</option></select>`,
+  onChange: (key, startISO, endISO) => {
+    LAST_DATE_RANGE = { key, startISO, endISO };
+    applyAllFilters();
+    if (RAW) applyFilter(key, startISO, endISO);
+  },
+});
+
+// Wire extra selects (available after DateFilter.mount injects the extras HTML)
+const machineSel = document.getElementById("dashMachine");
+const sourceSel  = document.getElementById("dashSource");
+const projectSel = document.getElementById("dashProject");
+
+if (machineSel) {
+  machineSel.addEventListener("change", () => {
+    CURRENT_MACHINE = machineSel.value;
+    rebuildAllDaily();
+    applyAllFilters();
+    if (RAW) { const dr = LAST_DATE_RANGE; applyFilter(dr.key || 'all', dr.startISO, dr.endISO); }
+  });
+}
+if (sourceSel) {
+  sourceSel.addEventListener("change", () => {
+    CURRENT_SOURCE = sourceSel.value;
+    rebuildProjectOptions();
+    applyAllFilters();
+    if (RAW) { const dr = LAST_DATE_RANGE; applyFilter(dr.key || 'all', dr.startISO, dr.endISO); }
+  });
+}
+if (projectSel) {
+  projectSel.addEventListener("change", () => {
+    CURRENT_PROJECT = projectSel.value;
+    applyAllFilters();
+    if (RAW) { const dr = LAST_DATE_RANGE; applyFilter(dr.key || 'all', dr.startISO, dr.endISO); }
+  });
+}
+
+loadInsightsForFilter().then(ins => {
+  if (!ins) return;
+  const allByDate = new Map(ALL_DAILY.map(d => [d.date, d]));
+  const agg = new Map();
+  for (const d of (ins.dailyTrend || [])) {
+    const ccDay = allByDate.get(d.date);
+    if (!ccDay) continue;
+    const dayCli    = (d.bySource || {}).cli    || 0;
+    const dayCowork = (d.bySource || {}).cowork || 0;
+    const dayTotal  = dayCli + dayCowork || 0;
+    if (dayTotal <= 0) continue;
+    const projects = d.byProject || {};
+    const projDetail = d.projectsDetail || {};
+    for (const [name, cost] of Object.entries(projects)) {
+      const m = WT_RE.exec(name);
+      const key = m ? m[1] : name;
+      const scaledTotal = (ccDay.cost || 0) * (cost / dayTotal);
+      let cliShareNum, coworkShareNum;
+      const pd = projDetail[name];
+      if (pd && pd.bySource) {
+        cliShareNum    = pd.bySource.cli    || 0;
+        coworkShareNum = pd.bySource.cowork || 0;
+      } else {
+        cliShareNum    = cost * dayCli    / dayTotal;
+        coworkShareNum = cost * dayCowork / dayTotal;
+      }
+      const scaledCli    = dayCli    > 0 ? (ccDay.cliCost    || 0) * (cliShareNum    / dayCli   ) : 0;
+      const scaledCowork = dayCowork > 0 ? (ccDay.coworkCost || 0) * (coworkShareNum / dayCowork) : 0;
+
+      const cur = agg.get(key) || { name: key, total: 0, cli: 0, cowork: 0, worktreeCount: 0 };
+      cur.total  += scaledTotal;
+      cur.cli    += scaledCli;
+      cur.cowork += scaledCowork;
+      if (m) cur.worktreeCount += 1;
+      agg.set(key, cur);
+    }
+  }
+  PROJECT_TOTALS_BY_SOURCE = Array.from(agg.values()).sort((a, b) => b.total - a.total);
+  rebuildProjectOptions();
+});
+
+// ── 7. Currency / plan / tz event listeners ───────────────────────────────
+document.addEventListener("currencychange", () => {
+  applyAllFilters();
+  if (RAW) { const dr = LAST_DATE_RANGE; applyFilter(dr.key || "all", dr.startISO, dr.endISO); }
+  if (PROJECT_TOTALS_BY_SOURCE.length) rebuildProjectOptions();
+});
+document.addEventListener("planchange", () => { applyAllFilters(); if (RAW) { const dr = LAST_DATE_RANGE; applyFilter(dr.key || 'all', dr.startISO, dr.endISO); } });
+document.addEventListener("tzchange",   () => { applyAllFilters(); if (RAW) { const dr = LAST_DATE_RANGE; applyFilter(dr.key || 'all', dr.startISO, dr.endISO); } });
+</script>
+  </div>
+</body>
+</html>

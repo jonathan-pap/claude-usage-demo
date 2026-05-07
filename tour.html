@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Your Story — Claude Usage</title>
+<link rel="stylesheet" href="themes.css" />
+<script src="util.js"></script>
+<script src="theme.js"></script>
+<script src="currency.js"></script>
+<script src="tzmode.js"></script>
+<script src="plan.js"></script>
+<script src="settings.js"></script>
+<style>
+  /* Theme tokens come from themes.css; only add layout/utility styles below */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1340px; margin: 0 auto; padding: 24px 24px 80px; }
+
+  /* Top nav */
+  .nav { margin-bottom: 24px; font-size: 13px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .nav a { color: var(--accent); text-decoration: none; }
+  .nav a:hover { text-decoration: underline; }
+
+  /* Hero */
+  .hero { text-align: center; padding: 32px 0 56px; border-bottom: 1px solid var(--border); margin-bottom: 56px; }
+  .hero .eyebrow {
+    display: inline-block; font-size: 11px; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px;
+  }
+  .hero h1 {
+    font-size: 38px; font-weight: 700; margin-bottom: 12px; letter-spacing: -0.02em;
+    line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  @media (max-width: 900px) {
+    .hero h1 { font-size: 28px; white-space: normal; }
+  }
+  .hero .lead { font-size: 17px; color: var(--muted); max-width: 580px; margin: 0 auto 32px; }
+  .hero .stat-row { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+  .hero .stat .num { font-size: 32px; font-weight: 700; color: var(--text); }
+  .hero .stat .lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Chapters */
+  .chapter { margin-bottom: 56px; }
+  .chapter .num {
+    display: inline-block; font-size: 11px; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;
+  }
+  .chapter h2 { font-size: 28px; margin-bottom: 16px; letter-spacing: -0.01em; }
+  .chapter .body {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+     margin-top: 8px;
+  }
+  .chapter .insight {
+    font-size: 18px; line-height: 1.55; margin-bottom: 20px;
+  }
+  .chapter .insight strong { color: var(--accent); }
+  .chapter .insight em { font-style: normal; color: var(--green); font-weight: 600; }
+
+  .stat-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px; margin: 20px 0;
+  }
+  .stat-grid .item {
+    background: var(--bg); border-radius: 8px; padding: 14px;
+    border: 1px solid var(--border);
+  }
+  .stat-grid .item .v { font-size: 22px; font-weight: 600; }
+  .stat-grid .item .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+  .cta {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent); color: white;
+    padding: 10px 18px; border-radius: 8px;
+    text-decoration: none; font-size: 14px; font-weight: 500;
+    transition: transform 0.15s, opacity 0.15s;
+    margin-top: 4px;
+  }
+  .cta:hover { transform: translateX(2px); opacity: 0.95; }
+  .cta-secondary {
+    background: transparent; color: var(--accent);
+    border: 1px solid var(--border);
+  }
+
+  .verdict {
+    background: rgba(74, 222, 128, 0.08); border-left: 3px solid var(--green);
+    padding: 14px 18px; border-radius: 4px; margin-top: 16px;
+    font-size: 14px;
+  }
+  .verdict.warn { background: rgba(251, 191, 36, 0.08); border-left-color: var(--amber); }
+  .verdict.info { background: rgba(96, 165, 250, 0.08); border-left-color: var(--blue); }
+
+  /* Footer nav */
+  .footer-nav {
+    margin-top: 80px; padding-top: 32px; border-top: 1px solid var(--border);
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+  }
+  .footer-nav a {
+    display: block; padding: 14px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); text-decoration: none; font-size: 13px;
+  }
+  .footer-nav a:hover { border-color: var(--accent); }
+  .footer-nav a .name { font-weight: 600; }
+  .footer-nav a .desc { color: var(--muted); font-size: 11px; margin-top: 4px; }
+
+  .meta {
+    text-align: center; color: var(--muted); font-size: 12px; margin-top: 32px;
+  }
+
+  @media (max-width: 600px) {
+    .hero h1 { font-size: 30px; }
+    .chapter h2 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <a href="index.html" style="font-weight: 600;">← Home</a>
+      <a href="explore.html">Explore</a>
+      <a href="timeline.html">Timeline</a>
+      <a href="projects.html">Projects</a>
+      <a href="improvements.html">Improvements</a>
+      <a href="plan.html">Plan</a>
+      <a href="tour.html" style="color: var(--text);">Story</a>
+      <a href="glossary.html">Glossary</a>
+      <span style="margin-left:auto; display:inline-flex; gap:8px; align-items:center;">
+        <span id="themeToggle"></span>
+        <span id="settings"></span>
+      </span>
+    </div>
+    <script>
+      ThemeToggle.mount("themeToggle");
+      Settings.mount("settings");
+    </script>
+
+    <div class="hero">
+      <div class="eyebrow">Claude Code Usage Story</div>
+      <h1 id="heroHeadline">Loading your story…</h1>
+      <p class="lead" id="heroLead"></p>
+      <div class="stat-row" id="heroStats"></div>
+    </div>
+
+    <!-- CHAPTER 1: The Big Picture -->
+    <div class="chapter">
+      <div class="num">Chapter 1</div>
+      <h2>The Big Picture</h2>
+      <div class="body">
+        <p class="insight" id="ch1Insight"></p>
+        <div class="stat-grid" id="ch1Stats"></div>
+        <div class="verdict info" id="ch1Verdict"></div>
+        <p style="margin-top: 16px;"><a href="explore.html#charts" class="cta">See the daily breakdown →</a></p>
+      </div>
+    </div>
+
+    <!-- CHAPTER 2: When You Work -->
+    <div class="chapter">
+      <div class="num">Chapter 2</div>
+      <h2>When You Work</h2>
+      <div class="body">
+        <p class="insight" id="ch2Insight"></p>
+        <div class="stat-grid" id="ch2Stats"></div>
+        <p style="margin-top: 16px;"><a href="timeline.html" class="cta">See timestamp-level activity →</a></p>
+      </div>
+    </div>
+
+    <!-- CHAPTER 3: What You're Building -->
+    <div class="chapter">
+      <div class="num">Chapter 3</div>
+      <h2>What You're Building</h2>
+      <div class="body">
+        <p class="insight" id="ch3Insight"></p>
+        <div class="stat-grid" id="ch3Stats"></div>
+        <p style="margin-top: 16px;"><a href="explore.html#breakdown" class="cta">See full attribution →</a></p>
+      </div>
+    </div>
+
+    <!-- CHAPTER 4: Where the Money Goes -->
+    <div class="chapter">
+      <div class="num">Chapter 4</div>
+      <h2>Where the Money Goes</h2>
+      <div class="body">
+        <p class="insight" id="ch4Insight"></p>
+        <div class="stat-grid" id="ch4Stats"></div>
+        <div class="verdict" id="ch4Verdict"></div>
+        <p style="margin-top: 16px;"><a href="explore.html#breakdown" class="cta-secondary cta">Drill into ROI by model →</a></p>
+      </div>
+    </div>
+
+    <!-- CHAPTER 5: Are You on the Right Plan? -->
+    <div class="chapter">
+      <div class="num">Chapter 5</div>
+      <h2>Are You on the Right Plan?</h2>
+      <div class="body">
+        <p class="insight" id="ch5Insight"></p>
+        <div class="stat-grid" id="ch5Stats"></div>
+        <div class="verdict" id="ch5Verdict"></div>
+        <p style="margin-top: 16px;">
+          <a href="whatif.html" class="cta">Run the plan optimizer →</a>
+          <a href="pricing.html" class="cta cta-secondary" style="margin-left: 8px;">See pricing tiers</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="footer-nav">
+      <a href="index.html"><div class="name">Home</div><div class="desc">Verdict &amp; top findings</div></a>
+      <a href="explore.html"><div class="name">Explore</div><div class="desc">Charts &amp; breakdown</div></a>
+      <a href="timeline.html"><div class="name">Timeline</div><div class="desc">Heatmap &amp; activity feed</div></a>
+      <a href="projects.html"><div class="name">Projects</div><div class="desc">Roster — CLI/Cowork by project</div></a>
+      <a href="improvements.html"><div class="name">Improvements</div><div class="desc">Recommendations from your data</div></a>
+      <a href="plan.html"><div class="name">Plan</div><div class="desc">What-If optimizer &amp; tier explorer</div></a>
+    </div>
+
+    <p class="meta" id="metaLine"></p>
+  </div>
+
+<!--
+  usage_data.js (~10KB) is small enough to load sync.
+  insights_data.js can be 500KB+ on heavy users — load it async after the
+  shell has rendered, then call render() once it arrives. machines/manifest
+  is also small but load async for consistency.
+-->
+<script src="usage_data.js" onerror="this.remove()"></script>
+<script>
+  (function loadAsync(src) {
+    const s = document.createElement("script");
+    s.src = src; s.async = true;
+    s.onload  = () => document.dispatchEvent(new CustomEvent("storydatachange"));
+    s.onerror = () => s.remove();
+    document.head.appendChild(s);
+  })("insights_data.js");
+  (function loadManifest() {
+    const s = document.createElement("script");
+    s.src = "machines/manifest.js"; s.async = true;
+    s.onload  = () => document.dispatchEvent(new CustomEvent("storydatachange"));
+    s.onerror = () => s.remove();
+    document.head.appendChild(s);
+  })();
+</script>
+<script>
+const fmtMoney = v => Currency.format(v);
+const fmtTok   = n => n >= 1e6 ? (n/1e6).toFixed(2) + "M" : n >= 1e3 ? (n/1e3).toFixed(1) + "K" : (n||0).toString();
+// Plan now comes from the user's selection in Settings (defaults to Max 5×).
+function currentPlan() {
+  const p = Plan.current();
+  return { key: p.key, name: p.name, monthly: p.monthly, kind: p.kind };
+}
+
+function pct(v) { return v.toFixed(0) + "%"; }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Helper: format weekday-hour from heatmap
+const WEEKDAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+function findPeakCell(heatmap) {
+  let best = { wd: 0, hr: 0, cost: 0 };
+  for (let wd = 0; wd < 7; wd++) {
+    for (let hr = 0; hr < 24; hr++) {
+      if (heatmap[wd][hr] > best.cost) best = { wd, hr, cost: heatmap[wd][hr] };
+    }
+  }
+  return best;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+function render() {
+  const u = window.USAGE_DATA;
+  const i = window.INSIGHTS;
+  const m = window.MACHINES_MANIFEST;
+
+  if (!u || !i) {
+    document.getElementById("heroHeadline").textContent = "Run update_usage.sh to populate your story";
+    document.getElementById("heroLead").textContent = "Once you've got data, this page will narrate it for you.";
+    return;
+  }
+
+  const totals = u.totals || {};
+  const hist = u.daily || [];
+  const span = hist.length > 0
+    ? Math.max(1, (new Date(hist[hist.length - 1].date) - new Date(hist[0].date)) / 86400000 + 1)
+    : 1;
+  const avgPerDay = (totals.totalCost || 0) / span;
+  const monthlyProjection = avgPerDay * 30.44;
+  const PLAN = currentPlan();
+  const isFlat = PLAN.kind === "subscription" && PLAN.monthly;
+  const planUtilization = isFlat ? monthlyProjection / PLAN.monthly * 100 : null;
+
+  // ─── HERO ─────────────────────────────────────────────────
+  document.getElementById("heroHeadline").textContent =
+    isFlat
+      ? `${fmtMoney(totals.totalCost)} of API value, on a ${PLAN.name.replace(/\s*\([^)]*\)\s*$/, '')} plan`
+      : `${fmtMoney(totals.totalCost)} of API value (pay-as-you-go)`;
+  const leadParts = [
+    `Your Claude Code usage across ${hist.length} active days`,
+    m && m.machineCount > 1 ? `on ${m.machineCount} machines` : null,
+    `would have cost ${fmtMoney(totals.totalCost)} on pay-as-you-go API.`,
+    isFlat ? `You actually paid ${fmtMoney(PLAN.monthly)}/month flat.` : null,
+  ].filter(Boolean);
+  document.getElementById("heroLead").textContent = leadParts.join(" ");
+  const hitRatio = totals.cacheHitRatio ? totals.cacheHitRatio * 100 : 0;
+  document.getElementById("heroStats").innerHTML = `
+    <div class="stat"><div class="num">${fmtMoney(totals.totalCost)}</div><div class="lbl">API value</div></div>
+    <div class="stat"><div class="num">${fmtTok(totals.totalTokens)}</div><div class="lbl">Tokens</div></div>
+    <div class="stat"><div class="num">${hist.length}</div><div class="lbl">Active days</div></div>
+    <div class="stat"><div class="num" style="color: var(--green);">${hitRatio.toFixed(1)}%</div><div class="lbl">Cache hit ratio</div></div>
+  `;
+
+  // ─── CHAPTER 1: The Big Picture ───────────────────────────
+  const peakDay = hist.reduce((m, d) => ((d.totalCost || 0) > (m?.totalCost || 0) ? d : m), null);
+  const cliCost = hist.reduce((s, d) => s + (d.cliCost || 0), 0);
+  const coworkCost = hist.reduce((s, d) => s + (d.coworkCost || 0), 0);
+  const cliPct = totals.totalCost > 0 ? cliCost / totals.totalCost * 100 : 0;
+
+  document.getElementById("ch1Insight").innerHTML =
+    `Over the last <strong>${span} days</strong>, you ran Claude Code on <strong>${hist.length}</strong> of them — ` +
+    `averaging <strong>${fmtMoney(avgPerDay)}/day</strong> of API-equivalent value. ` +
+    `Your peak day was <strong>${peakDay?.date || "—"}</strong> at <em>${fmtMoney(peakDay?.totalCost)}</em>. ` +
+    `Your work splits roughly <strong>${cliPct.toFixed(0)}% CLI / ${(100-cliPct).toFixed(0)}% Cowork</strong>.`;
+
+  document.getElementById("ch1Stats").innerHTML = `
+    <div class="item"><div class="v">${fmtMoney(avgPerDay)}</div><div class="l">Avg cost / day</div></div>
+    <div class="item"><div class="v">${fmtMoney(monthlyProjection)}</div><div class="l">Monthly projection</div></div>
+    <div class="item"><div class="v">${fmtMoney(peakDay?.totalCost || 0)}</div><div class="l">Peak day (${peakDay?.date || "—"})</div></div>
+    <div class="item"><div class="v">${fmtMoney(cliCost)}</div><div class="l">CLI total</div></div>
+    <div class="item"><div class="v">${fmtMoney(coworkCost)}</div><div class="l">Cowork total</div></div>
+  `;
+
+  let utilizationVerdict;
+  if (!isFlat) {
+    utilizationVerdict =
+      `On <strong>${PLAN.name}</strong> you're billed by usage, so projected monthly is just ` +
+      `<strong>${fmtMoney(monthlyProjection)}</strong>. No plan headroom to compare against.`;
+  } else if (planUtilization < 60) {
+    utilizationVerdict =
+      `Projected monthly API value (<strong>${fmtMoney(monthlyProjection)}</strong>) is <strong>${pct(planUtilization)}</strong> of your ${fmtMoney(PLAN.monthly)}/month ${PLAN.name} plan. ` +
+      `You have considerable headroom.`;
+  } else if (planUtilization < 100) {
+    utilizationVerdict =
+      `Projected monthly API value (<strong>${fmtMoney(monthlyProjection)}</strong>) is <strong>${pct(planUtilization)}</strong> of your plan. ` +
+      `Comfortable fit — you're getting good value.`;
+  } else {
+    utilizationVerdict =
+      `Projected monthly API value (<strong>${fmtMoney(monthlyProjection)}</strong>) is <strong>${pct(planUtilization)}</strong> of your plan. ` +
+      `You're getting <em>more value than you pay for</em> — ${PLAN.name} is paying off.`;
+  }
+  document.getElementById("ch1Verdict").innerHTML = utilizationVerdict;
+
+  // ─── CHAPTER 2: When You Work ─────────────────────────────
+  const heatmap = (i.heatmap && i.heatmap.cost) || [];
+  const peakCell = heatmap.length ? findPeakCell(heatmap) : null;
+  // Total cost per weekday
+  const weekdayTotals = WEEKDAYS.map((_, wd) =>
+    heatmap[wd] ? heatmap[wd].reduce((s, c) => s + c, 0) : 0
+  );
+  const topWeekday = weekdayTotals.indexOf(Math.max(...weekdayTotals));
+  // Hour-of-day distribution (sum across weekdays)
+  const hourTotals = Array(24).fill(0);
+  heatmap.forEach(row => row.forEach((c, h) => hourTotals[h] += c));
+  const peakHour = hourTotals.indexOf(Math.max(...hourTotals));
+  // Morning (05-12), afternoon (12-18), evening (18-22), night (22-05)
+  const buckets = { morning: 0, afternoon: 0, evening: 0, night: 0 };
+  hourTotals.forEach((c, h) => {
+    if (h >= 5 && h < 12)       buckets.morning   += c;
+    else if (h >= 12 && h < 18) buckets.afternoon += c;
+    else if (h >= 18 && h < 22) buckets.evening   += c;
+    else                         buckets.night     += c;
+  });
+  const topBucket = Object.entries(buckets).sort((a, b) => b[1] - a[1])[0];
+
+  document.getElementById("ch2Insight").innerHTML =
+    `Your busiest day-of-week is <strong>${WEEKDAYS[topWeekday]}</strong> ` +
+    `(${fmtMoney(weekdayTotals[topWeekday])} cumulative), and you cluster most activity around ` +
+    `<strong>${Tz.formatHourOfDay(peakHour)} ${Tz.label()}</strong>. ` +
+    `That puts you firmly in the <em>${topBucket[0]}</em> camp — ${pct(topBucket[1] / hourTotals.reduce((s,c)=>s+c,0) * 100)} of your activity.`;
+
+  const totalTurns = (i.totals && i.totals.turns) || 0;
+  const convCount = (i.conversations || []).length;
+  document.getElementById("ch2Stats").innerHTML = `
+    <div class="item"><div class="v">${WEEKDAYS[topWeekday]}</div><div class="l">Busiest weekday</div></div>
+    <div class="item"><div class="v">${Tz.formatHourOfDay(peakHour)}</div><div class="l">Peak hour (${Tz.label()})</div></div>
+    <div class="item"><div class="v">${peakCell ? WEEKDAYS[peakCell.wd] + " " + Tz.formatHourOfDay(peakCell.hr) : "—"}</div><div class="l">Peak slot</div></div>
+    <div class="item"><div class="v">${convCount}</div><div class="l">Conversations</div></div>
+    <div class="item"><div class="v">${totalTurns.toLocaleString()}</div><div class="l">Total turns</div></div>
+  `;
+
+  // ─── CHAPTER 3: What You're Building ──────────────────────
+  const projects = (i.byProject || []).slice(0, 3);
+  const topProject = projects[0];
+  const topMCP = (i.byMCPServer || [])[0];
+  const topTool = (i.byTool || [])[0];
+
+  document.getElementById("ch3Insight").innerHTML = topProject
+    ? `Most of your spend goes into <strong>${U.esc(topProject.name)}</strong> ` +
+      `(${fmtMoney(topProject.cost)}, <em>${pct(topProject.cost / (i.totals.cost || 1) * 100)}</em> of your tooling cost). ` +
+      `You're actively using <strong>${(i.byMCPServer || []).length} MCP server${(i.byMCPServer||[]).length===1?'':'s'}</strong>, ` +
+      `with <strong>${U.esc(topMCP?.server || '—')}</strong> dominating ${topMCP ? '(' + topMCP.invocations + ' calls)' : ''}.`
+    : "No project data available yet.";
+
+  const topToolName = topTool?.name?.length > 22 ? topTool.name.slice(0,19)+'…' : (topTool?.name || '—');
+  document.getElementById("ch3Stats").innerHTML = `
+    <div class="item"><div class="v" style="font-size: 16px;">${U.esc(topProject?.name || "—")}</div><div class="l">Top project · ${fmtMoney(topProject?.cost || 0)}</div></div>
+    <div class="item"><div class="v" style="font-size: 16px;">${U.esc(topMCP?.server || "—")}</div><div class="l">Top MCP · ${topMCP?.invocations || 0} calls</div></div>
+    <div class="item"><div class="v" style="font-size: 16px;">${U.esc(topToolName)}</div><div class="l">Top tool · ${fmtMoney(topTool?.approxCost || 0)}</div></div>
+    <div class="item"><div class="v">${(i.byTool || []).length}</div><div class="l">Tools used</div></div>
+    <div class="item"><div class="v">${(i.byProject || []).length}</div><div class="l">Projects active</div></div>
+  `;
+
+  // ─── CHAPTER 4: Where the Money Goes ──────────────────────
+  const models = i.byModel || [];
+  const totalNoCacheCost = models.reduce((s, m) => s + (m.noCacheCost || 0), 0);
+  const totalSaved = models.reduce((s, m) => s + (m.cacheSaved || 0), 0);
+  const savedPct = totalNoCacheCost > 0 ? totalSaved / totalNoCacheCost * 100 : 0;
+  const opusModels = models.filter(m => m.model.includes("opus"));
+  const sonnetModels = models.filter(m => m.model.includes("sonnet"));
+  const opusCost = opusModels.reduce((s, m) => s + m.cost, 0);
+  const sonnetCost = sonnetModels.reduce((s, m) => s + m.cost, 0);
+
+  document.getElementById("ch4Insight").innerHTML =
+    `Prompt caching is doing serious work for you: you'd have paid <strong>${fmtMoney(totalNoCacheCost)}</strong> ` +
+    `without it, but only paid <strong>${fmtMoney(i.totals.cost)}</strong> — a <em>${pct(savedPct)} discount</em> ` +
+    `from cache reuse alone. Your model mix is <strong>${pct(opusCost / (opusCost + sonnetCost) * 100)} Opus / ` +
+    `${pct(sonnetCost / (opusCost + sonnetCost) * 100)} Sonnet</strong> by cost.`;
+
+  document.getElementById("ch4Stats").innerHTML = `
+    <div class="item"><div class="v">${fmtMoney(i.totals.cost)}</div><div class="l">What you paid</div></div>
+    <div class="item"><div class="v" style="color: var(--amber);">${fmtMoney(totalNoCacheCost)}</div><div class="l">Without caching</div></div>
+    <div class="item"><div class="v" style="color: var(--green);">−${fmtMoney(totalSaved)}</div><div class="l">Caching saved (${pct(savedPct)})</div></div>
+    <div class="item"><div class="v">${fmtMoney(opusCost)}</div><div class="l">Opus spend</div></div>
+    <div class="item"><div class="v">${fmtMoney(sonnetCost)}</div><div class="l">Sonnet spend</div></div>
+  `;
+
+  // Cache efficiency callout — flag low-hit-ratio projects
+  const lowHitProjects = (i.byProject || []).filter(p => p.cacheHitRatio < 0.5 && p.cost > 1);
+  document.getElementById("ch4Verdict").innerHTML = lowHitProjects.length > 0
+    ? `<strong>Watch list:</strong> ${lowHitProjects.length} project${lowHitProjects.length === 1 ? '' : 's'} with sub-50% cache hit ratio — ` +
+      lowHitProjects.slice(0, 3).map(p => `<strong>${p.name}</strong> (${pct(p.cacheHitRatio * 100)})`).join(", ") +
+      `. Short conversations rarely benefit from caching; if these run regularly, consider how to extend conversation lifetime.`
+    : `All active projects show healthy cache hit ratios (≥50%). Caching is paying off across the board.`;
+  document.getElementById("ch4Verdict").className = lowHitProjects.length > 0 ? "verdict warn" : "verdict";
+
+  // ─── CHAPTER 5: Are You on the Right Plan? ────────────────
+  const yearlyAPI = monthlyProjection * 12;
+  const yearlyPlan = isFlat ? PLAN.monthly * 12 : null;
+  const annualDelta = isFlat ? yearlyPlan - yearlyAPI : null;
+
+  let planVerdict;
+  if (!isFlat) {
+    planVerdict =
+      `<strong>You're on ${PLAN.name}.</strong> ` +
+      `At ${fmtMoney(monthlyProjection)}/month projected, your annual API cost is about <strong>${fmtMoney(yearlyAPI)}</strong>. ` +
+      `Compare against subscription tiers in the plan optimizer.`;
+  } else if (planUtilization < 50) {
+    planVerdict =
+      `<strong>You're paying ${fmtMoney(yearlyPlan)}/year for what would cost ${fmtMoney(yearlyAPI)}/year on API.</strong> ` +
+      `That's ${fmtMoney(annualDelta)} of effective insurance against rate-limit interruptions. ` +
+      `If your usage stays predictable, switching to API would save money — but you'd lose the throughput guarantee.`;
+  } else if (planUtilization < 100) {
+    planVerdict =
+      `<strong>${PLAN.name} is well-matched to your usage.</strong> ` +
+      `Annual cost: ${fmtMoney(yearlyPlan)} fixed vs ${fmtMoney(yearlyAPI)} variable. ` +
+      `You're using ${pct(planUtilization)} of plan equivalent.`;
+  } else {
+    planVerdict =
+      `<strong>You're getting more value than you pay for.</strong> ` +
+      `Plan: ${fmtMoney(yearlyPlan)}/year. API equivalent: ${fmtMoney(yearlyAPI)}/year. ` +
+      `That's ${fmtMoney(yearlyAPI - yearlyPlan)} you're <em>not</em> paying. Stay on ${PLAN.name}.`;
+  }
+  document.getElementById("ch5Verdict").innerHTML = planVerdict;
+  document.getElementById("ch5Verdict").className =
+    isFlat && planUtilization < 50 ? "verdict warn" : "verdict";
+
+  document.getElementById("ch5Insight").innerHTML = isFlat
+    ? `Your monthly API-equivalent rate of <strong>${fmtMoney(monthlyProjection)}</strong> represents ` +
+      `<strong>${pct(planUtilization)}</strong> of your ${fmtMoney(PLAN.monthly)} ${PLAN.name} plan capacity (in dollar value, ` +
+      `not message-rate limits). Annualized: ${fmtMoney(yearlyAPI)} vs ${fmtMoney(yearlyPlan)} flat.`
+    : `Your monthly API-equivalent rate is <strong>${fmtMoney(monthlyProjection)}</strong>. ` +
+      `On <strong>${PLAN.name}</strong>, that's what you actually pay — there's no flat-fee comparison. ` +
+      `See the plan optimizer for what a fixed-tier alternative would cost.`;
+
+  document.getElementById("ch5Stats").innerHTML = `
+    <div class="item"><div class="v">${fmtMoney(monthlyProjection)}</div><div class="l">API equivalent / month</div></div>
+    <div class="item"><div class="v">${isFlat ? fmtMoney(PLAN.monthly) : "—"}</div><div class="l">Your plan / month</div></div>
+    <div class="item"><div class="v" style="color: ${isFlat && planUtilization >= 80 ? 'var(--green)' : 'var(--amber)'};">${isFlat ? pct(planUtilization) : "n/a"}</div><div class="l">Plan utilization</div></div>
+    <div class="item"><div class="v">${fmtMoney(yearlyAPI)}</div><div class="l">API / year</div></div>
+    <div class="item"><div class="v">${isFlat ? fmtMoney(yearlyPlan) : "—"}</div><div class="l">Plan / year</div></div>
+  `;
+
+  // ─── META ─────────────────────────────────────────────────
+  const machineCount = m ? m.machineCount : 1;
+  const machineNames = m ? m.machines.map(x => x.machine).join(", ") : "this machine";
+  document.getElementById("metaLine").innerHTML =
+    `Generated ${u.lastUpdated || ""} · ${machineCount} machine${machineCount === 1 ? '' : 's'}: ${machineNames} · ` +
+    `<a href="usage_history.json" style="color: var(--muted);">raw daily data</a> · ` +
+    `<a href="insights.json" style="color: var(--muted);">raw insights data</a>`;
+}
+
+render();
+document.addEventListener("currencychange", render);
+document.addEventListener("planchange",     render);
+document.addEventListener("tzchange",        render);
+// Re-render when async insights / manifest data arrives.
+document.addEventListener("storydatachange", render);
+</script>
+</body>
+</html>

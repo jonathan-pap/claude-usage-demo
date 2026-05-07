@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Claude Usage</title>
+<link rel="stylesheet" href="themes.css" />
+<script src="util.js"></script>
+<script src="theme.js"></script>
+<script src="currency.js"></script>
+<script src="tzmode.js"></script>
+<script src="plan.js"></script>
+<script src="settings.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+  }
+  .wrap { max-width: 1340px; margin: 0 auto; padding: 24px 24px 80px; }
+
+  /* ─── Nav ───────────────────────────────────────────────── */
+  .nav { margin-bottom: 24px; font-size: 13px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .nav a { color: var(--accent); text-decoration: none; }
+  .nav a:hover { text-decoration: underline; }
+
+  /* ─── Verdict hero ──────────────────────────────────────── */
+  .verdict-hero {
+    border-radius: 14px; padding: 28px 32px;
+    border-left: 4px solid var(--border);
+    margin-bottom: 24px;
+    transition: border-color 0.3s, background 0.3s;
+  }
+  .verdict-badge {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.5px;
+    margin-bottom: 10px; color: var(--muted);
+  }
+  .verdict-headline {
+    font-size: 26px; font-weight: 700; letter-spacing: -0.02em;
+    line-height: 1.25; margin-bottom: 8px;
+  }
+  @media (max-width: 680px) { .verdict-headline { font-size: 20px; } }
+  .verdict-meta { font-size: 12px; color: var(--muted); }
+
+  /* ─── Delta band ─────────────────────────────────────────── */
+  .delta-band {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px; margin-bottom: 28px;
+  }
+  .delta-tile {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .delta-tile .dt-label {
+    font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
+  }
+  .delta-tile .dt-value {
+    font-size: 22px; font-weight: 700; line-height: 1;
+  }
+  .delta-tile .dt-sub {
+    font-size: 12px; color: var(--muted); margin-top: 5px;
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  .delta-up   { color: var(--red); font-weight: 600; }
+  .delta-down { color: var(--green); font-weight: 600; }
+  .delta-flat { color: var(--muted); }
+
+  /* ─── Top findings section ──────────────────────────────── */
+  .section-head {
+    display: flex; align-items: baseline; gap: 12px;
+    margin-bottom: 14px;
+  }
+  .section-head h2 { font-size: 18px; font-weight: 700; }
+  .section-head a  { font-size: 13px; color: var(--accent); text-decoration: none; }
+  .section-head a:hover { text-decoration: underline; }
+  .section-head .rec-count { color: var(--muted); font-size: 13px; }
+
+  /* ─── Recommendation cards (matches improvements.html) ──── */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px; margin-bottom: 24px;
+  }
+  .rec {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px;
+    display: flex; flex-direction: column; gap: 8px;
+    border-left: 4px solid var(--border);
+    transition: transform 0.15s;
+  }
+  .rec:hover { transform: translateY(-2px); }
+  .rec.high   { border-left-color: var(--red); }
+  .rec.medium { border-left-color: var(--amber); }
+  .rec.low    { border-left-color: var(--blue); }
+  .rec.win    { border-left-color: var(--green); }
+
+  .rec-head {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  }
+  .rec-title { font-size: 15px; font-weight: 600; flex: 1; }
+  .rec-pills { display: inline-flex; gap: 6px; flex-shrink: 0; }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .pill-high   { background: rgba(239,68,68,0.15);  color: var(--red); }
+  .pill-medium { background: rgba(251,191,36,0.15); color: var(--amber); }
+  .pill-low    { background: rgba(96,165,250,0.15); color: var(--blue); }
+  .pill-win    { background: rgba(74,222,128,0.15); color: var(--green); }
+  .pill-cat    { background: var(--card-hi); color: var(--muted); }
+
+  .rec-context { font-size: 13px; color: var(--text); }
+  .rec-context strong { color: var(--accent); }
+  .rec-context em  { font-style: normal; color: var(--green); font-weight: 600; }
+  .rec-context .neg { color: var(--red); font-weight: 600; }
+
+  .rec-action {
+    background: var(--bg-soft); border-radius: 6px;
+    padding: 8px 12px; font-size: 12px; color: var(--muted);
+    border-left: 2px solid var(--border);
+  }
+  .rec-action strong { color: var(--text); }
+  .rec-impact {
+    display: flex; gap: 12px; font-size: 11px; color: var(--muted);
+    margin-top: auto; padding-top: 8px;
+    border-top: 1px dashed var(--border);
+    flex-wrap: wrap;
+  }
+  .rec-impact .met { color: var(--text); font-weight: 600; }
+  .rec-impact a    { color: var(--accent); text-decoration: none; }
+
+  /* ─── Action row below cards ─────────────────────────────── */
+  .action-row {
+    display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 48px;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 18px; border-radius: 8px;
+    text-decoration: none; font-size: 14px; font-weight: 500;
+    transition: transform 0.15s, opacity 0.15s;
+  }
+  .btn:hover { transform: translateX(2px); opacity: 0.9; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-secondary {
+    background: transparent; color: var(--accent);
+    border: 1px solid var(--border);
+  }
+
+  /* ─── Empty state ────────────────────────────────────────── */
+  .empty-state {
+    text-align: center; padding: 48px 24px; color: var(--muted);
+    background: var(--card); border: 1px dashed var(--border); border-radius: 12px;
+    margin-bottom: 24px;
+  }
+  .empty-state code {
+    display: block; margin-top: 10px; font-size: 13px; color: var(--text);
+    font-family: monospace; background: var(--bg-soft);
+    padding: 4px 10px; border-radius: 4px; display: inline-block;
+  }
+
+  /* ─── Footer nav ─────────────────────────────────────────── */
+  .footer-nav {
+    margin-top: 40px; padding-top: 32px; border-top: 1px solid var(--border);
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+  }
+  .footer-nav a {
+    display: block; padding: 14px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); text-decoration: none; font-size: 13px;
+  }
+  .footer-nav a:hover { border-color: var(--accent); }
+  .footer-nav a .name { font-weight: 600; }
+  .footer-nav a .desc { color: var(--muted); font-size: 11px; margin-top: 4px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+
+    <!-- Nav -->
+    <div class="nav">
+      <span style="color: var(--text); font-weight: 600;">Home</span>
+      <a href="explore.html">Explore</a>
+      <a href="timeline.html">Timeline</a>
+      <a href="projects.html">Projects</a>
+      <a href="improvements.html">Improvements</a>
+      <a href="plan.html">Plan</a>
+      <a href="tour.html">Story</a>
+      <a href="glossary.html">Glossary</a>
+      <span style="margin-left:auto; display:inline-flex; gap:8px; align-items:center;">
+        <span id="themeToggle"></span>
+        <span id="settings"></span>
+      </span>
+    </div>
+    <script>
+      ThemeToggle.mount("themeToggle");
+      Settings.mount("settings");
+    </script>
+
+    <!-- Verdict hero -->
+    <div class="verdict-hero" id="verdictHero">
+      <div class="verdict-badge" id="verdictBadge">Loading…</div>
+      <div class="verdict-headline" id="verdictHeadline">Analysing your usage data…</div>
+      <div class="verdict-meta" id="verdictMeta"></div>
+    </div>
+
+    <!-- Week-over-week delta band -->
+    <div class="delta-band" id="deltaBand"></div>
+
+    <!-- Top findings -->
+    <div class="section-head">
+      <h2>Top findings</h2>
+      <span class="rec-count" id="recCount"></span>
+      <a href="improvements.html" id="allFindings">See all findings →</a>
+    </div>
+    <div class="cards-grid" id="cardsGrid"></div>
+
+    <!-- Action row -->
+    <div class="action-row">
+      <a href="tour.html" class="btn btn-secondary">Take the guided story tour →</a>
+    </div>
+
+    <!-- Footer nav -->
+    <div class="footer-nav">
+      <a href="explore.html"><div class="name">Explore</div><div class="desc">Charts &amp; breakdown</div></a>
+      <a href="timeline.html"><div class="name">Timeline</div><div class="desc">Heatmap &amp; activity feed</div></a>
+      <a href="projects.html"><div class="name">Projects</div><div class="desc">Roster — CLI/Cowork by project</div></a>
+      <a href="improvements.html"><div class="name">Improvements</div><div class="desc">All findings &amp; recommendations</div></a>
+      <a href="plan.html"><div class="name">Plan</div><div class="desc">What-If optimizer &amp; tier explorer</div></a>
+      <a href="tour.html"><div class="name">Story</div><div class="desc">Five-chapter narrative tour</div></a>
+      <a href="glossary.html"><div class="name">Glossary</div><div class="desc">Terms &amp; formula definitions</div></a>
+    </div>
+
+  </div>
+
+<script>
+// ── Helpers ───────────────────────────────────────────────────────────────
+const fmtMoney = v => Currency.format(v);
+const fmtTok   = n => n >= 1e6 ? (n/1e6).toFixed(2)+"M" : n >= 1e3 ? (n/1e3).toFixed(1)+"K" : (n||0).toString();
+
+// ── Shared state ──────────────────────────────────────────────────────────
+let RAW     = null;   // INSIGHTS  (from insights_data.js)
+let HISTORY = null;   // USAGE_DATA (from usage_data.js)
+let RECS    = [];
+
+// ── Data loading ──────────────────────────────────────────────────────────
+function loadAll() {
+  const s1 = document.createElement("script");
+  s1.src = "insights_data.js";
+  s1.onload = s1.onerror = () => {
+    RAW = window.INSIGHTS || null;
+    const s2 = document.createElement("script");
+    s2.src = "usage_data.js";
+    s2.onload = s2.onerror = () => {
+      HISTORY = window.USAGE_DATA || null;
+      // Also load manifest for machine count in meta line.
+      const s3 = document.createElement("script");
+      s3.src = "machines/manifest.js";
+      s3.onload = s3.onerror = () => render();
+      document.head.appendChild(s3);
+    };
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s1);
+}
+
+// ── Week delta computation ─────────────────────────────────────────────────
+function weekDeltas(daily) {
+  // Reference = today (the page's local date).
+  const todayMs = new Date();
+  todayMs.setHours(23, 59, 59, 999);
+  const oneWeekAgo  = new Date(todayMs); oneWeekAgo.setDate(todayMs.getDate() - 7);  oneWeekAgo.setHours(0,0,0,0);
+  const twoWeeksAgo = new Date(todayMs); twoWeeksAgo.setDate(todayMs.getDate() - 14); twoWeeksAgo.setHours(0,0,0,0);
+
+  function sumPeriod(start, end) {
+    const days = (daily || []).filter(d => {
+      const dt = new Date(d.date + "T00:00:00");
+      return dt > start && dt <= end;
+    });
+    const cost = days.reduce((s, d) => s + (d.totalCost || 0), 0);
+    return { cost, activeDays: days.length };
+  }
+
+  return {
+    thisWeek: sumPeriod(oneWeekAgo, todayMs),
+    lastWeek: sumPeriod(twoWeeksAgo, oneWeekAgo),
+  };
+}
+
+// ── Recommendation builders (mirrors improvements.html) ─────────────────
+
+function buildCacheHitRecs() {
+  const candidates = (RAW.byProject || [])
+    .filter(p => p.turns >= 10 && p.cost > 1 && p.cacheHitRatio < 0.7)
+    .sort((a, b) => a.cacheHitRatio - b.cacheHitRatio);
+  for (const p of candidates.slice(0, 5)) {
+    const potentialSaving = p.cost * (1 - p.cacheHitRatio) * 0.4;
+    RECS.push({
+      severity: p.cacheHitRatio < 0.5 ? "high" : "medium",
+      category: "cache",
+      title: `Low cache hit on ${p.name}`,
+      context: `<strong>${U.esc(p.name)}</strong> ran <em>${p.turns}</em> turns at <span class="neg">${(p.cacheHitRatio*100).toFixed(0)}% cache hit</span> — most context is being re-read fresh each turn instead of pulled from cache.`,
+      action: `Check whether the session restarts frequently or large files are re-read. Adding a CLAUDE.md to keep context stable typically lifts hit ratio above 90%.`,
+      impact: { saved: potentialSaving, ref: "insights.html#projects" },
+      impactSort: potentialSaving,
+    });
+  }
+}
+
+function buildExpensiveProjects() {
+  const totalCost = RAW.totals?.cost || 0;
+  const top = (RAW.byProject || [])[0];
+  if (!top || totalCost <= 0) return;
+  const share = top.cost / totalCost;
+  if (share < 0.4) return;
+  RECS.push({
+    severity: share > 0.6 ? "high" : "medium",
+    category: "cost",
+    title: `${top.name} dominates spend`,
+    context: `<strong>${U.esc(top.name)}</strong> accounts for <em>${(share*100).toFixed(0)}%</em> of your API-equivalent cost (${fmtMoney(top.cost)} of ${fmtMoney(totalCost)}). A small efficiency win there beats every other change.`,
+    action: `Run a cache-hit audit on this project (Insights → Per-Project Detail). If the hit ratio is below 90% and it's your daily driver, focus there first.`,
+    impact: { share, ref: "insights.html#projects" },
+    impactSort: top.cost,
+  });
+}
+
+function buildIdleSessions() {
+  const idle = (RAW.conversations || []).filter(c =>
+    (c.turns || 0) > 0 && (c.turns || 0) < 20 && (c.durationMinutes || 0) > 60 * 24
+  ).sort((a, b) => (b.durationMinutes || 0) - (a.durationMinutes || 0));
+  if (!idle.length) return;
+  const top = idle[0];
+  const days = (top.durationMinutes / (60 * 24)).toFixed(1);
+  RECS.push({
+    severity: "low",
+    category: "session",
+    title: `Sessions left open for days`,
+    context: `Longest near-idle session: <strong>${U.esc(top.name || top.sessionId.slice(0,8))}</strong> — <em>${days} days</em> open, only <em>${top.turns}</em> turns. ${idle.length > 1 ? `${idle.length - 1} more follow the same pattern.` : ""}`,
+    action: `Use <code>/clear</code> or close terminals between sessions — fresh sessions often get better cache hit ratios than stale contexts.`,
+    impact: { count: idle.length, ref: "insights.html#conversations" },
+    impactSort: idle.length,
+  });
+}
+
+function buildMcpHotspots() {
+  const servers = (RAW.byMCPServer || []).filter(m => m.invocations >= 10);
+  if (!servers.length) return;
+  const ranked = servers.map(m => ({ ...m, cpc: m.approxCost / m.invocations })).sort((a, b) => b.cpc - a.cpc);
+  const top = ranked[0];
+  if (top.cpc < 0.05) return;
+  RECS.push({
+    severity: top.cpc > 0.5 ? "medium" : "low",
+    category: "tool",
+    title: `${top.server} is expensive per call`,
+    context: `<strong>${U.esc(top.server)}</strong> averages <em>${fmtMoney(top.cpc)} per call</em> across ${top.invocations.toLocaleString()} invocations (${fmtMoney(top.approxCost)} total). High cost-per-call usually means each invocation pulls a lot of context.`,
+    action: `Check if you can call this tool less often or with narrower queries.`,
+    impact: { cpc: top.cpc, total: top.approxCost, ref: "insights.html#mcp-subagents" },
+    impactSort: top.approxCost,
+  });
+}
+
+function buildModelMix() {
+  const models = RAW.byModel || [];
+  const opusCost   = models.filter(m => (m.model||"").includes("opus")).reduce((s, m) => s + (m.cost||0), 0);
+  const sonnetCost = models.filter(m => (m.model||"").includes("sonnet")).reduce((s, m) => s + (m.cost||0), 0);
+  const haikuCost  = models.filter(m => (m.model||"").includes("haiku")).reduce((s, m) => s + (m.cost||0), 0);
+  const total = opusCost + sonnetCost + haikuCost;
+  if (total <= 0) return;
+  const opusPct = opusCost / total;
+  if (opusPct > 0.85) {
+    RECS.push({
+      severity: "medium",
+      category: "cost",
+      title: `Heavy Opus usage (${(opusPct*100).toFixed(0)}%)`,
+      context: `Opus accounts for <em>${(opusPct*100).toFixed(0)}%</em> of spend (${fmtMoney(opusCost)}). Opus is right for hard reasoning, but Sonnet handles most code edits at <em>roughly 1/8 the price</em>.`,
+      action: `For routine edits and tool-heavy work, Sonnet is usually fine. Reserve Opus for architecture decisions and hard debugging.`,
+      impact: { saved: opusCost * 0.3, ref: "insights.html#roi" },
+      impactSort: opusCost,
+    });
+  }
+}
+
+function buildContextBloat() {
+  const convs = (RAW.conversations || []).filter(c => (c.turns||0) >= 10);
+  if (!convs.length) return;
+  const ranked = convs
+    .map(c => ({ ...c, avgCtx: c.avgContextPerTurn || ((c.input||0)+(c.cacheRead||0)) / Math.max(1, c.turns) }))
+    .sort((a, b) => b.avgCtx - a.avgCtx);
+  const top = ranked[0];
+  if (top.avgCtx < 100_000) return;
+  RECS.push({
+    severity: top.avgCtx > 300_000 ? "high" : "medium",
+    category: "session",
+    title: `Context bloat on ${top.name || "a session"}`,
+    context: `Session <strong>${U.esc(top.name || top.sessionId.slice(0,8))}</strong> averages <span class="neg">${fmtTok(top.avgCtx)} tokens per turn</span> across ${top.turns.toLocaleString()} turns. That drives up per-turn cost even with caching.`,
+    action: `Compress: extract a CLAUDE.md with stable facts, drop irrelevant history, or split into a fresh session with a brief.`,
+    impact: { avgCtx: top.avgCtx, ref: "insights.html#conversations" },
+    impactSort: top.avgCtx,
+  });
+}
+
+function buildPlanFit() {
+  const plan = Plan.current();
+  const totals = HISTORY?.totals || {};
+  const daily  = HISTORY?.daily  || [];
+  if (plan.kind !== "subscription" || !plan.monthly || !daily.length) return;
+  const span = (new Date(daily[daily.length-1].date) - new Date(daily[0].date)) / 86400000 + 1;
+  const monthly = ((totals.totalCost||0) / span) * 30.44;
+  const utilisation = monthly / plan.monthly;
+  if (utilisation < 0.5) {
+    RECS.push({
+      severity: "low",
+      category: "plan",
+      title: `${plan.name}: under-utilised`,
+      context: `Projecting <em>${fmtMoney(monthly)}/mo</em> API value on a <strong>${U.esc(plan.name)}</strong> plan (${fmtMoney(plan.monthly)}/mo) — <em>${(utilisation*100).toFixed(0)}%</em> utilisation. Roughly half your fee buys headroom you may not need.`,
+      action: `If usage is steady, a smaller plan saves money. Run the Plan Optimizer to see breakeven points.`,
+      impact: { saved: (plan.monthly - monthly) * 12, ref: "whatif.html" },
+      impactSort: (plan.monthly - monthly) * 12,
+    });
+  } else if (utilisation > 1.0) {
+    RECS.push({
+      severity: "win",
+      category: "plan",
+      title: `${plan.name}: getting more than you pay for`,
+      context: `Projected monthly API value <em>${fmtMoney(monthly)}</em> exceeds your plan fee <strong>${fmtMoney(plan.monthly)}</strong> — utilisation <em>${(utilisation*100).toFixed(0)}%</em>. The flat fee is paying off vs API rates.`,
+      action: `Stay put — pay-as-you-go would cost ${fmtMoney(monthly - plan.monthly)}/mo more.`,
+      impact: { gained: (monthly - plan.monthly) * 12, ref: "whatif.html" },
+      impactSort: (monthly - plan.monthly) * 12,
+    });
+  }
+}
+
+function buildHygieneRecs() {
+  const wtRe = /^(.*?) \(wt: ([^)]+)\)$/;
+  const wtCounts = new Map();
+  for (const p of (RAW.byProject || [])) {
+    const m = wtRe.exec(p.name);
+    if (m) wtCounts.set(m[1], (wtCounts.get(m[1]) || 0) + 1);
+  }
+  const heaviest = [...wtCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (heaviest && heaviest[1] >= 3) {
+    RECS.push({
+      severity: "low",
+      category: "hygiene",
+      title: `${heaviest[1]} worktrees on ${heaviest[0]}`,
+      context: `Claude Code created <em>${heaviest[1]}</em> worktree directories under <strong>${U.esc(heaviest[0])}</strong>. Stale ones clutter <code>.claude/worktrees/</code> and inflate the project list.`,
+      action: `<code>git worktree prune</code> in the parent repo, or delete <code>.claude/worktrees/</code> entries you no longer need.`,
+      impact: { count: heaviest[1], ref: "projects.html" },
+      impactSort: heaviest[1],
+    });
+  }
+
+  const ref = (RAW.generatedAt || "").slice(0, 10);
+  if (ref) {
+    const cutoff = new Date(ref);
+    cutoff.setUTCDate(cutoff.getUTCDate() - 30);
+    const cutoffISO = cutoff.toISOString().slice(0, 10);
+    const dead = (RAW.byProject || []).filter(p =>
+      (p.cost||0) < 1 || ((p.lastActivity||"").slice(0,10) < cutoffISO));
+    if (dead.length >= 5) {
+      RECS.push({
+        severity: "low",
+        category: "hygiene",
+        title: `${dead.length} dead-end projects`,
+        context: `<em>${dead.length}</em> projects are below $1 spend or idle &gt;30 days — they clutter the project filters.`,
+        action: `Projects page "Hide dead-ends" filter is already on by default. Or remove the underlying <code>~/.claude/projects/&lt;slug&gt;/</code> dirs.`,
+        impact: { count: dead.length, ref: "projects.html" },
+        impactSort: dead.length,
+      });
+    }
+  }
+}
+
+function buildWins() {
+  const total = RAW.totals || {};
+  const overallHit = (total.cacheRead||0) / Math.max(1, (total.cacheRead||0) + (total.cacheCreate||0));
+  if (overallHit > 0.92) {
+    RECS.push({
+      severity: "win",
+      category: "cache",
+      title: `${(overallHit*100).toFixed(1)}% overall cache hit`,
+      context: `Across <em>${(total.turns||0).toLocaleString()}</em> turns and <em>${fmtTok(total.cacheRead)}</em> cache reads, overall hit ratio is <strong>${(overallHit*100).toFixed(1)}%</strong>. Without caching the same workload would cost roughly <em>${fmtMoney((total.cost||0) * 8)}</em>.`,
+      action: `Keep doing what you're doing. The <a href="insights.html#roi">Cache ROI table</a> shows exact savings per model.`,
+      impact: { hit: overallHit, ref: "insights.html#roi" },
+      impactSort: overallHit * 1000,
+    });
+  }
+}
+
+// ── Build & sort all recs ────────────────────────────────────────────────
+function buildRecs() {
+  RECS = [];
+  if (!RAW) return;
+  buildCacheHitRecs();
+  buildExpensiveProjects();
+  buildIdleSessions();
+  buildMcpHotspots();
+  buildModelMix();
+  buildContextBloat();
+  buildPlanFit();
+  buildHygieneRecs();
+  buildWins();
+
+  const sevOrder = { high: 0, medium: 1, low: 2, win: 3 };
+  RECS.sort((a, b) => {
+    const s = (sevOrder[a.severity] ?? 4) - (sevOrder[b.severity] ?? 4);
+    return s !== 0 ? s : (b.impactSort || 0) - (a.impactSort || 0);
+  });
+}
+
+// ── Render verdict hero ──────────────────────────────────────────────────
+function renderVerdictHero() {
+  const hero   = document.getElementById("verdictHero");
+  const badge  = document.getElementById("verdictBadge");
+  const hdl    = document.getElementById("verdictHeadline");
+  const meta   = document.getElementById("verdictMeta");
+
+  if (!RAW && !HISTORY) {
+    hero.style.background = "rgba(96,165,250,0.06)";
+    hero.style.borderLeftColor = "var(--blue)";
+    badge.textContent = "No data";
+    hdl.textContent = "Run update_usage.sh to populate your dashboard";
+    meta.textContent = "Once you have data, this page will answer: should I change anything?";
+    return;
+  }
+
+  const high   = RECS.filter(r => r.severity === "high");
+  const med    = RECS.filter(r => r.severity === "medium");
+  const wins   = RECS.filter(r => r.severity === "win");
+
+  let bgColor, borderColor, badgeText, headline;
+
+  if (high.length > 0) {
+    bgColor     = "rgba(239,68,68,0.06)";
+    borderColor = "var(--red)";
+    badgeText   = "⚠ Action needed";
+    headline    = high.length === 1
+      ? `${high[0].title} — needs your attention`
+      : `${high.length} high-priority findings need attention`;
+  } else if (med.length > 0) {
+    bgColor     = "rgba(251,191,36,0.06)";
+    borderColor = "var(--amber)";
+    badgeText   = "↗ On track";
+    headline    = `Looking good — ${med[0].title}`;
+  } else if (wins.length > 0) {
+    bgColor     = "rgba(74,222,128,0.06)";
+    borderColor = "var(--green)";
+    badgeText   = "✓ All clear";
+    headline    = wins[0].title;
+  } else {
+    bgColor     = "rgba(74,222,128,0.06)";
+    borderColor = "var(--green)";
+    badgeText   = "✓ All clear";
+    headline    = "Nothing critical to address. Keep going.";
+  }
+
+  hero.style.background    = bgColor;
+  hero.style.borderLeftColor = borderColor;
+  badge.style.color        = borderColor;
+  badge.textContent        = badgeText;
+  hdl.textContent          = headline;
+
+  // Meta line
+  const u = HISTORY;
+  const m = window.MACHINES_MANIFEST;
+  const parts = [];
+  if (u) {
+    const hist = u.daily || [];
+    parts.push(`${hist.length} active days`);
+    if (m && m.machineCount > 1) parts.push(`${m.machineCount} machines: ${m.machines.map(x => x.machine).join(", ")}`);
+    if (u.lastUpdated) parts.push(`updated ${u.lastUpdated}`);
+  }
+  if (RECS.length) parts.push(`${RECS.length} findings`);
+  meta.textContent = parts.join(" · ");
+}
+
+// ── Render delta band ────────────────────────────────────────────────────
+function renderDeltaBand() {
+  const band = document.getElementById("deltaBand");
+  const u = HISTORY;
+  if (!u || !u.daily || !u.daily.length) {
+    band.innerHTML = "";
+    return;
+  }
+
+  const hist   = u.daily || [];
+  const deltas = weekDeltas(hist);
+  const tw = deltas.thisWeek;
+  const lw = deltas.lastWeek;
+
+  function deltaCost(curr, prev) {
+    if (!prev || prev === 0) return '<span class="delta-flat">no prior data</span>';
+    const diff = curr - prev;
+    const pct  = (diff / prev * 100).toFixed(0);
+    const cls  = diff > 0 ? "delta-up" : "delta-down";
+    const sign = diff > 0 ? "↑" : "↓";
+    return `<span class="${cls}">${sign}${Math.abs(pct)}% vs prior week</span>`;
+  }
+
+  // Monthly pace from recent 30 days
+  const today   = new Date(); today.setHours(23,59,59,999);
+  const d30ago  = new Date(today); d30ago.setDate(today.getDate() - 30); d30ago.setHours(0,0,0,0);
+  const recent30 = hist.filter(d => new Date(d.date+"T00:00:00") >= d30ago);
+  const recent30cost = recent30.reduce((s,d) => s+(d.totalCost||0), 0);
+  const pace = recent30.length > 0 ? (recent30cost / recent30.length) * 30.44 : null;
+
+  const PLAN = Plan.current();
+  const isFlat = PLAN.kind === "subscription" && PLAN.monthly;
+  const paceContext = isFlat && pace
+    ? `${(pace / PLAN.monthly * 100).toFixed(0)}% of ${PLAN.name.replace(/\s*\([^)]*\)\s*$/, "")} plan`
+    : (pace ? `based on last ${recent30.length} active days` : "");
+
+  const thisDailyAvg = tw.activeDays > 0 ? tw.cost / tw.activeDays : 0;
+  const lastDailyAvg = lw.activeDays > 0 ? lw.cost / lw.activeDays : 0;
+  const avgDelta = lastDailyAvg > 0
+    ? `<span class="${thisDailyAvg > lastDailyAvg ? 'delta-up' : 'delta-down'}">${thisDailyAvg > lastDailyAvg ? '↑' : '↓'}${Math.abs((thisDailyAvg - lastDailyAvg) / lastDailyAvg * 100).toFixed(0)}% vs prior week</span>`
+    : '<span class="delta-flat">no prior data</span>';
+
+  band.innerHTML = `
+    <div class="delta-tile">
+      <div class="dt-label">This week</div>
+      <div class="dt-value">${fmtMoney(tw.cost)}</div>
+      <div class="dt-sub">${deltaCost(tw.cost, lw.cost)}</div>
+    </div>
+    <div class="delta-tile">
+      <div class="dt-label">Active days</div>
+      <div class="dt-value">${tw.activeDays}<span style="font-size:14px;font-weight:400;color:var(--muted);"> / 7</span></div>
+      <div class="dt-sub"><span class="delta-flat">${lw.activeDays} / 7 prior week</span></div>
+    </div>
+    <div class="delta-tile">
+      <div class="dt-label">Daily avg (active days)</div>
+      <div class="dt-value">${tw.activeDays > 0 ? fmtMoney(thisDailyAvg) : "—"}</div>
+      <div class="dt-sub">${tw.activeDays > 0 ? avgDelta : '<span class="delta-flat">no active days this week</span>'}</div>
+    </div>
+    <div class="delta-tile">
+      <div class="dt-label">Monthly pace</div>
+      <div class="dt-value">${pace != null ? fmtMoney(pace) : "—"}</div>
+      <div class="dt-sub"><span class="delta-flat">${paceContext}</span></div>
+    </div>
+  `;
+}
+
+// ── Render top-3 cards ───────────────────────────────────────────────────
+function renderImpact(r) {
+  const i = r.impact || {};
+  const parts = [];
+  if (i.saved  > 0)    parts.push(`<span>Save <span class="met">~${fmtMoney(i.saved)}/yr</span></span>`);
+  if (i.gained > 0)    parts.push(`<span>Gained <span class="met">~${fmtMoney(i.gained)}/yr</span></span>`);
+  if (i.share != null) parts.push(`<span>Share <span class="met">${(i.share*100).toFixed(0)}%</span></span>`);
+  if (i.cpc   != null) parts.push(`<span>Per-call <span class="met">${fmtMoney(i.cpc)}</span></span>`);
+  if (i.avgCtx!= null) parts.push(`<span>Avg ctx <span class="met">${fmtTok(i.avgCtx)}</span></span>`);
+  if (i.count != null) parts.push(`<span>Count <span class="met">${i.count}</span></span>`);
+  if (i.hit   != null) parts.push(`<span>Hit ratio <span class="met">${(i.hit*100).toFixed(1)}%</span></span>`);
+  if (i.ref)           parts.push(`<a href="${U.escAttr(i.ref)}">View →</a>`);
+  return parts.length ? `<div class="rec-impact">${parts.join("")}</div>` : "";
+}
+
+function renderTopCards() {
+  const grid  = document.getElementById("cardsGrid");
+  const count = document.getElementById("recCount");
+  const link  = document.getElementById("allFindings");
+
+  if (!RAW) {
+    grid.innerHTML = `<div class="empty-state">
+      No data yet — run <code>update_usage.sh</code> (or <code>update_usage.ps1</code>) to populate.<br>
+      <a href="tour.html" style="color: var(--accent); font-size: 13px; margin-top: 8px; display: inline-block;">Take the guided story tour →</a>
+    </div>`;
+    count.textContent = "";
+    link.textContent = "See all findings →";
+    return;
+  }
+
+  const top3 = RECS.slice(0, 3);
+  const hiCount = RECS.filter(r => r.severity === "high").length;
+  const medCount = RECS.filter(r => r.severity === "medium").length;
+  const winCount = RECS.filter(r => r.severity === "win").length;
+
+  count.textContent = `${hiCount} high · ${medCount} medium · ${winCount} wins`;
+  link.textContent  = `See all ${RECS.length} findings →`;
+
+  if (!top3.length) {
+    grid.innerHTML = `<div class="empty-state">No recommendations generated — all metrics look healthy.</div>`;
+    return;
+  }
+
+  grid.innerHTML = top3.map(r => {
+    const sev      = r.severity;
+    const sevLabel = sev === "win" ? "Win" : sev[0].toUpperCase() + sev.slice(1);
+    return `
+      <div class="rec ${U.escAttr(sev)}">
+        <div class="rec-head">
+          <div class="rec-title">${U.esc(r.title)}</div>
+          <div class="rec-pills">
+            <span class="pill pill-${U.escAttr(sev)}">${U.esc(sevLabel)}</span>
+            <span class="pill pill-cat">${U.esc(r.category)}</span>
+          </div>
+        </div>
+        <div class="rec-context">${r.context}</div>
+        <div class="rec-action"><strong>Try:</strong> ${r.action}</div>
+        ${renderImpact(r)}
+      </div>
+    `;
+  }).join("");
+}
+
+// ── Master render ────────────────────────────────────────────────────────
+function render() {
+  buildRecs();
+  renderVerdictHero();
+  renderDeltaBand();
+  renderTopCards();
+}
+
+// Re-render on settings changes
+Settings.onChange(render);
+
+// Start loading data
+loadAll();
+</script>
+</body>
+</html>

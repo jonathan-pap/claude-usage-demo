@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Timeline — Timestamp-level Activity</title>
+<link rel="stylesheet" href="themes.css" />
+<script src="util.js"></script>
+<script src="theme.js"></script>
+<script src="currency.js"></script>
+<script src="tzmode.js"></script>
+<script src="plan.js"></script>
+<script src="settings.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>
+  /* Theme tokens come from themes.css; only add layout/utility styles below */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);  min-height: 100vh;
+  }
+  .wrap { max-width: 1340px; margin: 0 auto; padding: 24px; }
+  h1 { font-size: 24px; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); margin-bottom: 16px; font-size: 14px; }
+  .nav { margin-bottom: 24px; font-size: 13px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .nav a { color: var(--accent); text-decoration: none; margin-right: 16px; }
+  .nav a:hover { text-decoration: underline; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px; margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 14px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 12px; font-weight: 500;
+  }
+  .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .kpi .value { font-size: 22px; font-weight: 600; }
+  .kpi .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .chart-wrap { position: relative; height: 220px; }
+  .chart-wrap.tall { height: 380px; }
+
+  /* Day × Hour heatmap grid */
+  .heatmap {
+    display: grid;
+    grid-template-columns: 32px repeat(24, 1fr);
+    gap: 2px;
+    font-size: 10px;
+    color: var(--muted);
+    max-width: 900px;
+  }
+  .heatmap .hdr { text-align: center; padding: 2px 0; font-size: 9px; }
+  .heatmap .label { padding: 2px 4px; text-align: right; align-self: center; font-size: 10px; }
+  .heatmap .cell {
+    aspect-ratio: 1;
+    max-height: 22px;
+    border-radius: 3px;
+    background: rgba(96, 165, 250, 0.08);
+    cursor: default;
+    transition: outline 0.1s;
+    position: relative;
+  }
+  .heatmap .cell:hover { outline: 1px solid var(--accent); }
+  .heatmap .cell .tip {
+    position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 8px; font-size: 11px; color: var(--text);
+    white-space: nowrap; pointer-events: none;
+    opacity: 0; transition: opacity 0.1s; z-index: 10;
+  }
+  .heatmap .cell:hover .tip { opacity: 1; }
+
+  /* GitHub-style yearly contribution heatmap (fluid width) */
+  .gh-wrap { display: flex; gap: 8px; align-items: flex-start; padding: 2px 0; }
+  .gh-grid { padding-bottom: 4px; }
+  .gh-days {
+    display: grid; grid-template-rows: repeat(7, 1fr); gap: 2px;
+    padding-top: 18px; font-size: 9px; color: var(--muted);
+    flex: 0 0 auto;
+  }
+  .gh-days span { line-height: 1; align-self: center; height: 100%; display: flex; align-items: center; }
+  .gh-grid { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; }
+  .gh-months {
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+    gap: 2px; font-size: 9px; color: var(--muted); height: 12px;
+  }
+  .gh-months span { overflow: visible; white-space: nowrap; }
+  .gh-cells {
+    display: grid; grid-auto-flow: column;
+    grid-auto-columns: 21px;
+    justify-content: start;
+    gap: 2px;
+  }
+  .gh-months {
+    grid-auto-columns: 21px;
+    justify-content: start;
+    gap: 2px;
+  }
+  .gh-week { display: grid; grid-template-rows: repeat(7, 21px); gap: 2px; }
+  .gh-days {
+    grid-template-rows: repeat(7, 21px) !important;
+    gap: 2px !important;
+    font-size: 11px;
+  }
+  .gh-days span {
+    display: flex; align-items: center; justify-content: flex-end;
+    padding-right: 4px; line-height: 21px; height: 21px;
+  }
+  .gh-cell {
+    width: 100%; height: 100%;
+    border-radius: 3px;
+    background: rgba(96, 165, 250, 0.06);
+    position: relative; cursor: default;
+  }
+  .gh-cell.empty { background: transparent; }
+  .gh-cell.dim   { background: rgba(255, 255, 255, 0.025); }
+  .gh-cell:hover { outline: 1px solid var(--accent); }
+  .gh-cell.clickable { cursor: pointer; }
+  .gh-cell.selected  { outline: 2px solid var(--text); outline-offset: 1px; z-index: 5; }
+  .gh-cell .tip {
+    position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 8px; font-size: 11px; color: var(--text);
+    white-space: nowrap; pointer-events: none;
+    opacity: 0; transition: opacity 0.1s; z-index: 10;
+  }
+  .gh-cell:hover .tip { opacity: 1; }
+  .gh-legend { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 10px; justify-content: flex-end; }
+  .gh-legend .gh-cell { width: 12px; height: 12px; cursor: default; flex: 0 0 auto; }
+
+  /* Activity feed */
+  .feed { max-height: 600px; overflow-y: auto; font-size: 13px; }
+  .feed-row {
+    display: grid;
+    grid-template-columns: 160px 70px 100px 1fr 70px 80px;
+    gap: 12px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+  }
+  .feed-row:hover { background: rgba(96, 165, 250, 0.04); }
+  .feed-time { color: var(--muted); font-family: monospace; font-size: 12px; }
+  .feed-cost { text-align: right; font-variant-numeric: tabular-nums; }
+  .feed-tools { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pill {
+    display: inline-block; padding: 1px 6px; border-radius: 8px;
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+  }
+  .pill-cli    { background: rgba(96, 165, 250, 0.18); color: #60a5fa; }
+  .pill-cowork { background: rgba(244, 114, 182, 0.18); color: #f472b6; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+  <div class="nav">
+    <a href="index.html" style="font-weight: 600;">← Home</a>
+    <a href="explore.html">Explore</a>
+    <a href="timeline.html" style="color: var(--text);">Timeline</a>
+    <a href="projects.html">Projects</a>
+    <a href="improvements.html">Improvements</a>
+    <a href="plan.html">Plan</a>
+    <a href="tour.html">Story</a>
+    <a href="glossary.html">Glossary</a>
+    <span style="margin-left:auto; display:inline-flex; gap:8px; align-items:center;">
+      <span id="themeToggle"></span>
+      <span id="settings"></span>
+    </span>
+  </div>
+  <script>
+    ThemeToggle.mount("themeToggle");
+    Settings.mount("settings");
+  </script>
+  <h1>Timeline — Timestamp-level Activity</h1>
+  <p class="subtitle" id="subtitle">Loading…</p>
+
+  <div id="dateFilter"></div>
+  <script src="date_filter.js"></script>
+
+  <div class="grid-kpis" id="kpis"></div>
+
+  <div class="card">
+      <h2>Daily Activity (contribution heatmap)</h2>
+      <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+        One square per calendar day. Brighter = more spend. Click a day to drill into its hourly trend.
+      </p>
+      <div id="ghHeatmap"></div>
+      <div class="gh-legend">
+        <span>Less</span>
+        <span class="gh-cell" style="background: rgba(96,165,250,0.08);"></span>
+        <span class="gh-cell" style="background: rgba(217,119,87,0.30);"></span>
+        <span class="gh-cell" style="background: rgba(217,119,87,0.55);"></span>
+        <span class="gh-cell" style="background: rgba(217,119,87,0.80);"></span>
+        <span class="gh-cell" style="background: rgba(217,119,87,1.00);"></span>
+        <span>More</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+        <h2 style="margin: 0;">Hourly Cost Trend</h2>
+        <div id="cellFilterChip" style="display:none; font-size: 11px; color: var(--muted);">
+          <span>Drilled into <strong id="cellFilterDate"></strong></span>
+          <button id="cellFilterClear" style="margin-left:8px; background:transparent; border:1px solid var(--border); color:var(--muted); border-radius:4px; padding:2px 6px; font-size:10px; cursor:pointer;">clear</button>
+        </div>
+      </div>
+      <p style="color: var(--muted); font-size: 12px; margin: 8px 0 12px;">
+        Each point is one hour. Gaps mean no Claude activity that hour.
+      </p>
+      <div class="chart-wrap tall"><canvas id="hourlyChart"></canvas></div>
+    </div>
+
+  <div class="card">
+    <h2>Turn Inter-arrival Time</h2>
+    <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+      Gap between consecutive turns. Tight clusters = active conversations; long gaps = breaks. Outliers (&gt;30 min) clamped.
+    </p>
+    <div class="chart-wrap"><canvas id="gapChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h2>Activity Feed (most recent {LIMIT} turns)</h2>
+    <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+      Per-turn log with full timestamps. No conversation content — just what tools ran when, on which project.
+    </p>
+    <div class="feed" id="feed"></div>
+  </div>
+
+<script>
+const fmtMoney = v => Currency.format(v);
+const fmtTok   = n => n >= 1e6 ? (n/1e6).toFixed(2) + "M" : n >= 1e3 ? (n/1e3).toFixed(1) + "K" : (n||0).toString();
+
+Chart.defaults.color = "#8a93a3";
+Chart.defaults.borderColor = "#2a3441";
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+let RAW = null;
+let CHARTS = {};
+let LAST_RANGE = null;
+let CELL_FILTER = null;  // ISO date string when a heatmap cell is drilled-in
+
+function setCellFilter(date) {
+  CELL_FILTER = date;
+  if (LAST_RANGE) applyFilter(LAST_RANGE.key, LAST_RANGE.startISO, LAST_RANGE.endISO);
+}
+
+function loadInsights() {
+  // Best effort: load cross-machine merged daily + hourly series so charts
+  // reflect every machine. Falls back to local-only data if shims missing.
+  const tryShim = (src) => new Promise(res => {
+    const s = document.createElement("script");
+    s.src = src; s.onload = s.onerror = res;
+    document.head.appendChild(s);
+  });
+  Promise.all([
+    tryShim("machines/daily_merged.js"),
+    tryShim("machines/hourly_merged.js"),
+  ]).then(() => {
+    if (window.INSIGHTS) { onLoaded(window.INSIGHTS); return; }
+    const s = document.createElement("script");
+    s.src = "insights_data.js";
+    s.onload  = () => { window.INSIGHTS ? onLoaded(window.INSIGHTS) : fallback(); };
+    s.onerror = fallback;
+    document.head.appendChild(s);
+  });
+}
+function fallback() {
+  fetch("insights.json").then(r => r.json()).then(onLoaded).catch(e => {
+    document.getElementById("subtitle").textContent = "Failed to load insights data — run build_insights.py first.";
+    console.error(e);
+  });
+}
+function onLoaded(d) {
+  RAW = d;
+  const latestDate = (d.dailyTrend && d.dailyTrend.length) ? d.dailyTrend[d.dailyTrend.length - 1].date : null;
+  DateFilter.mount("dateFilter", {
+    storageKey: "ccusage.timeline.range",
+    defaultKey: "today",
+    referenceDate: latestDate,
+    onChange: applyFilter,
+  });
+  document.getElementById("cellFilterClear").addEventListener("click", () => setCellFilter(null));
+}
+
+function applyFilter(rangeKey, startISO, endISO) {
+  if (!RAW) return;
+  LAST_RANGE = { key: rangeKey, startISO, endISO };
+  const inDate = (ts) => DateFilter.inRange((ts || "").slice(0, 10), startISO, endISO);
+  // Prefer cross-machine merged hourly series when available so the line chart
+  // shows every machine, not just this one.
+  const hourlySrc = (window.HOURLY_MERGED && window.HOURLY_MERGED.length)
+    ? window.HOURLY_MERGED
+    : (RAW.hourlyTrend || []);
+  const hourly = hourlySrc.filter(h => inDate(h.hour));
+  const turns  = (RAW.turnLog || []).filter(t => inDate(t.timestamp));
+  render({ hourly, turns, rangeKey, startISO, endISO });
+}
+
+function render(d) {
+  document.getElementById("subtitle").textContent =
+    `${d.turns.length.toLocaleString()} turns shown · ${d.hourly.length} active hours · range: ${d.startISO || "all"} → ${d.endISO || "all"}`;
+
+  // KPIs
+  const totalCost = d.turns.reduce((s, t) => s + (t.cost || 0), 0);
+  const tokens = d.turns.reduce((s, t) => s + (t.input + t.output + t.cacheCreate + t.cacheRead), 0);
+  // Peak hour
+  let peakHour = null, peakHourCost = 0;
+  d.hourly.forEach(h => { if (h.cost > peakHourCost) { peakHourCost = h.cost; peakHour = h.hour; } });
+  const activeHours = d.hourly.filter(h => h.cost > 0).length;
+  const span = (() => {
+    if (d.startISO && d.endISO) {
+      return Math.max(1, Math.ceil((new Date(d.endISO) - new Date(d.startISO)) / 86400000) + 1);
+    }
+    if (!d.turns.length) return 1;
+    let lo = Infinity, hi = -Infinity;
+    d.turns.forEach(t => {
+      const ms = new Date(t.timestamp).getTime();
+      if (!isNaN(ms)) { if (ms < lo) lo = ms; if (ms > hi) hi = ms; }
+    });
+    if (!isFinite(lo)) return 1;
+    return Math.max(1, Math.ceil((hi - lo) / 86400000) + 1);
+  })();
+
+  document.getElementById("kpis").innerHTML = `
+    <div class="card kpi" style="margin:0;"><div class="label">Total Cost</div>
+      <div class="value">${fmtMoney(totalCost)}</div>
+      <div class="sub">${d.turns.length.toLocaleString()} turns</div></div>
+    <div class="card kpi" style="margin:0;"><div class="label">Active Hours</div>
+      <div class="value">${activeHours}</div>
+      <div class="sub">over ${span} day${span===1?'':'s'}</div></div>
+    <div class="card kpi" style="margin:0;"><div class="label">Peak Hour</div>
+      <div class="value" style="font-size: 18px;">${peakHour ? Tz.formatHour(peakHour) : "—"}</div>
+      <div class="sub">${fmtMoney(peakHourCost)} that hour</div></div>
+    <div class="card kpi" style="margin:0;"><div class="label">Tokens</div>
+      <div class="value">${fmtTok(tokens)}</div>
+      <div class="sub">in selected range</div></div>
+  `;
+
+  // GitHub-style yearly contribution heatmap.
+  // Prefer the cross-machine merged series (machines/daily_merged.js) so the
+  // calendar reflects every machine, not just this one's local insights.
+  renderGHHeatmap(window.DAILY_MERGED || RAW.dailyTrend || [], d.startISO, d.endISO);
+
+  // Cell-drill chip: when a heatmap cell is selected, narrow the chart to that date.
+  const chip = document.getElementById("cellFilterChip");
+  let chartHourly = d.hourly;
+  if (CELL_FILTER) {
+    const drillSrc = (window.HOURLY_MERGED && window.HOURLY_MERGED.length)
+      ? window.HOURLY_MERGED
+      : (RAW.hourlyTrend || []);
+    chartHourly = drillSrc.filter(h => h.hour.startsWith(CELL_FILTER));
+    chip.style.display = "inline-flex";
+    document.getElementById("cellFilterDate").textContent = CELL_FILTER;
+  } else {
+    chip.style.display = "none";
+  }
+
+  // Hourly chart (line + soft area fill)
+  if (CHARTS.hourly) CHARTS.hourly.destroy();
+  CHARTS.hourly = new Chart(document.getElementById("hourlyChart"), {
+    type: "line",
+    data: {
+      labels: chartHourly.map(h => Tz.formatHour(h.hour)),
+      datasets: [{
+        data: chartHourly.map(h => +h.cost.toFixed(4)),
+        borderColor: "#d97757",
+        backgroundColor: "rgba(217, 119, 87, 0.12)",
+        borderWidth: 1.5,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: "#d97757",
+        tension: 0.25,
+        fill: true,
+        spanGaps: false,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "nearest", axis: "x", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${Currency.format(ctx.parsed.y, {decimals:4})} · ${chartHourly[ctx.dataIndex].turns} turns` } },
+      },
+      scales: {
+        x: { ticks: { autoSkip: true, maxTicksLimit: 18, font: { size: 10 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { callback: v => Currency.format(v) } },
+      },
+    },
+  });
+
+  // Activity feed
+  const limit = 200;
+  const feed = d.turns.slice(0, limit);
+  // The underlying turnLog itself is capped (see CCUSAGE_TURN_LOG_CAP in
+  // build_insights.py — defaults to 1000). Surface the cap so users know
+  // older activity isn't missing — just truncated.
+  const totalRaw = (RAW && RAW.turnLogTotal != null) ? RAW.turnLogTotal : d.turns.length;
+  const cappedNote = totalRaw > d.turns.length
+    ? ` · capped at ${d.turns.length} of ${totalRaw.toLocaleString()} parsed (set CCUSAGE_TURN_LOG_CAP)`
+    : '';
+  const feedTitle = Array.from(document.querySelectorAll('h2')).find(h => h.textContent.includes('Activity Feed'));
+  if (feedTitle) feedTitle.textContent = `Activity Feed (${feed.length} of ${d.turns.length} turns${cappedNote})`;
+  document.getElementById("feed").innerHTML = feed.map(t => {
+    const dt = new Date(t.timestamp);
+    const ts = isNaN(dt) ? U.esc(t.timestamp) : U.esc(Tz.formatStamp(t.timestamp));
+    const toolsRaw = (t.tools || []).join(", ") || "—";
+    const tools = U.esc(toolsRaw);
+    const model = U.esc((t.model || "").replace("claude-", "").replace("-20251001", ""));
+    const src   = U.esc(t.source);
+    return `<div class="feed-row">
+      <div class="feed-time">${ts}</div>
+      <div><span class="pill pill-${src}">${src}</span></div>
+      <div style="color: var(--muted); font-size: 11px;">${model}</div>
+      <div><strong>${U.esc(t.project || "—")}</strong> <span class="feed-tools">${tools}</span></div>
+      <div class="feed-cost" style="color: var(--muted); font-size: 11px;">${t.toolCount} tool${t.toolCount===1?'':'s'}</div>
+      <div class="feed-cost">${fmtMoney(t.cost)}</div>
+    </div>`;
+  }).join("");
+
+  // Inter-arrival time histogram
+  const sorted = d.turns.slice().sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const gaps = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const dt = (new Date(sorted[i].timestamp) - new Date(sorted[i-1].timestamp)) / 1000; // seconds
+    if (dt >= 0 && dt < 1800) gaps.push(dt);  // clamp <30min
+  }
+  // Bucket: 0-10s, 10-30s, 30s-1m, 1-2m, 2-5m, 5-10m, 10-30m
+  const buckets = [
+    { label: "0-10s",   max: 10 },
+    { label: "10-30s",  max: 30 },
+    { label: "30s-1m",  max: 60 },
+    { label: "1-2m",    max: 120 },
+    { label: "2-5m",    max: 300 },
+    { label: "5-10m",   max: 600 },
+    { label: "10-30m",  max: 1800 },
+  ];
+  const counts = buckets.map(() => 0);
+  let prevMax = 0;
+  for (let i = 0; i < buckets.length; i++) {
+    counts[i] = gaps.filter(g => g > prevMax && g <= buckets[i].max).length;
+    prevMax = buckets[i].max;
+  }
+  if (CHARTS.gap) CHARTS.gap.destroy();
+  CHARTS.gap = new Chart(document.getElementById("gapChart"), {
+    type: "bar",
+    data: {
+      labels: buckets.map(b => b.label),
+      datasets: [{ data: counts, backgroundColor: "#a78bfa", borderRadius: 4 }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+}
+
+function renderGHHeatmap(dailyTrend, startISO, endISO) {
+  const el = document.getElementById("ghHeatmap");
+  const byDay = {};
+  const machinesByDay = {};
+  dailyTrend.forEach(d => {
+    if (!d || !d.date) return;
+    byDay[d.date] = (d.cost || 0);
+    if (d.byMachine) machinesByDay[d.date] = d.byMachine;
+  });
+
+  // Calendar end = filter end, or today if filter is open
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const calEnd = new Date((endISO || todayISO) + "T00:00:00Z");
+
+  // Calendar always covers at least 52 full weeks ending at calEnd.
+  // If the filter range extends further back, expand the calendar to fit.
+  let calStart = new Date(calEnd);
+  calStart.setUTCDate(calStart.getUTCDate() - 7 * 52 + 1);
+  if (startISO) {
+    const fStart = new Date(startISO + "T00:00:00Z");
+    if (fStart < calStart) calStart = fStart;
+  }
+  // Align to previous Monday so weeks are columns running Mon → Sun top-to-bottom
+  while (calStart.getUTCDay() !== 1) calStart.setUTCDate(calStart.getUTCDate() - 1);
+
+  const filterStart = startISO ? new Date(startISO + "T00:00:00Z") : null;
+  const filterEnd   = endISO   ? new Date(endISO   + "T00:00:00Z") : null;
+
+  // Max cost across in-filter days only — keeps colour scale stable
+  let maxCost = 0;
+  Object.entries(byDay).forEach(([day, cost]) => {
+    const dt = new Date(day + "T00:00:00Z");
+    const inFilter = (!filterStart || dt >= filterStart) && (!filterEnd || dt <= filterEnd);
+    if (inFilter && cost > maxCost) maxCost = cost;
+  });
+  const cap = maxCost > 0 ? maxCost : 1;
+
+  const weeks = [];
+  const monthLabels = [];
+  let cur = new Date(calStart);
+  let lastMonth = -1;
+  while (cur <= calEnd) {
+    const week = [];
+    for (let i = 0; i < 7; i++) {
+      const iso = cur.toISOString().slice(0, 10);
+      const beyondEnd = cur > calEnd;
+      const inFilter  = !beyondEnd
+        && (!filterStart || cur >= filterStart)
+        && (!filterEnd   || cur <= filterEnd);
+      week.push({
+        date: iso,
+        cost: byDay[iso] || 0,
+        beyondEnd,
+        inFilter,
+      });
+      if (i === 0) {
+        const m = cur.getUTCMonth();
+        monthLabels.push(m !== lastMonth ? cur.toLocaleString("en", { month: "short", timeZone: "UTC" }) : "");
+        lastMonth = m;
+      }
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    weeks.push(week);
+  }
+
+  const cellClass = (c) => {
+    if (c.beyondEnd) return "gh-cell empty";
+    if (!c.inFilter) return "gh-cell dim";
+    return "gh-cell";
+  };
+  const cellColor = (c) => {
+    if (c.beyondEnd || !c.inFilter) return null;          // CSS handles
+    if (c.cost <= 0) return "rgba(96, 165, 250, 0.08)";
+    const t = Math.min(1, c.cost / cap);
+    if (t < 0.25) return "rgba(217, 119, 87, 0.30)";
+    if (t < 0.50) return "rgba(217, 119, 87, 0.55)";
+    if (t < 0.80) return "rgba(217, 119, 87, 0.80)";
+    return              "rgba(217, 119, 87, 1.00)";
+  };
+
+  const monthRow = '<div class="gh-months">' +
+    monthLabels.map(m => `<span>${m}</span>`).join("") + '</div>';
+
+  const cellsHtml = weeks.map(w => {
+    return '<div class="gh-week">' + w.map(c => {
+      let cls = cellClass(c);
+      if (!c.beyondEnd) cls += " clickable";
+      if (CELL_FILTER && c.date === CELL_FILTER) cls += " selected";
+      const bg  = cellColor(c);
+      const style = bg ? `background:${bg};` : "";
+      const dataAttr = c.beyondEnd ? "" : ` data-date="${c.date}"`;
+      let tipBody = "";
+      if (!c.beyondEnd) {
+        const m = machinesByDay[c.date];
+        const breakdown = m
+          ? " · " + Object.entries(m).map(([k, v]) => `${k}: ${fmtMoney(v)}`).join(", ")
+          : "";
+        tipBody = `${c.date} — ${fmtMoney(c.cost)}${breakdown}${c.inFilter ? "" : " (out of range)"}`;
+      }
+      const tip = c.beyondEnd ? "" : `<span class="tip">${tipBody}</span>`;
+      return `<div class="${cls}"${dataAttr} style="${style}">${tip}</div>`;
+    }).join("") + '</div>';
+  }).join("");
+
+  el.innerHTML = `
+    <div class="gh-wrap">
+      <div class="gh-days">
+        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span>
+        <span>Fri</span><span>Sat</span><span>Sun</span>
+      </div>
+      <div class="gh-grid">
+        ${monthRow}
+        <div class="gh-cells">${cellsHtml}</div>
+      </div>
+    </div>
+  `;
+
+  // Click-to-drill: clicking a populated day narrows the hourly chart to that date.
+  el.querySelectorAll(".gh-cell.clickable").forEach(cell => {
+    cell.addEventListener("click", () => {
+      const date = cell.dataset.date;
+      if (!date) return;
+      // Toggle off if clicking the active cell
+      setCellFilter(CELL_FILTER === date ? null : date);
+    });
+  });
+}
+
+loadInsights();
+
+// Re-render charts/feed/heatmap when currency or timezone changes.
+// Timezone affects displayed labels only — the underlying data stays UTC.
+const _rerunFilter = () => {
+  if (LAST_RANGE) applyFilter(LAST_RANGE.key, LAST_RANGE.startISO, LAST_RANGE.endISO);
+};
+document.addEventListener("currencychange", _rerunFilter);
+document.addEventListener("tzchange",       _rerunFilter);
+</script>
+  </div>
+</body>
+</html>

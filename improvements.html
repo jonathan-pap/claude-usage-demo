@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Improvements — Data-Driven Recommendations</title>
+<link rel="stylesheet" href="themes.css" />
+<script src="util.js"></script>
+<script src="theme.js"></script>
+<script src="currency.js"></script>
+<script src="tzmode.js"></script>
+<script src="plan.js"></script>
+<script src="settings.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);  min-height: 100vh;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1340px; margin: 0 auto; padding: 24px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); margin-bottom: 24px; font-size: 14px; }
+  .nav { margin-bottom: 24px; font-size: 13px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .nav a { color: var(--accent); text-decoration: none; }
+  .nav a:hover { text-decoration: underline; }
+
+  /* Top summary KPI band */
+  .top-band {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px; margin-bottom: 24px;
+  }
+  .top-band .stat {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .top-band .stat .label {
+    font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .top-band .stat .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+  .top-band .stat .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* Filter bar for severity / category */
+  .filter-bar {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 20px;
+    font-size: 13px;
+  }
+  .filter-bar .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .filter-bar button {
+    background: var(--bg-soft); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 4px 12px; font-size: 12px; font-family: inherit; cursor: pointer;
+  }
+  .filter-bar button:hover { color: var(--text); border-color: var(--accent); }
+  .filter-bar button.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .filter-bar .count {
+    color: var(--muted); font-size: 12px; margin-left: auto;
+  }
+
+  /* Recommendation cards */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 16px;
+  }
+  .rec {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px;
+    display: flex; flex-direction: column; gap: 8px;
+    border-left: 4px solid var(--border);
+    transition: transform 0.15s, border-color 0.15s;
+  }
+  .rec:hover { transform: translateY(-2px); }
+  .rec.high   { border-left-color: var(--red); }
+  .rec.medium { border-left-color: var(--amber); }
+  .rec.low    { border-left-color: var(--blue); }
+  .rec.win    { border-left-color: var(--green); }
+
+  .rec-head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 12px;
+  }
+  .rec-title { font-size: 15px; font-weight: 600; flex: 1; }
+  .rec-pills { display: inline-flex; gap: 6px; flex-shrink: 0; }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .pill-high   { background: rgba(239,68,68,0.15);  color: var(--red); }
+  .pill-medium { background: rgba(251,191,36,0.15); color: var(--amber); }
+  .pill-low    { background: rgba(96,165,250,0.15); color: var(--blue); }
+  .pill-win    { background: rgba(74,222,128,0.15); color: var(--green); }
+  .pill-cat    { background: var(--card-hi); color: var(--muted); }
+
+  .rec-context { font-size: 13px; color: var(--text); }
+  .rec-context strong { color: var(--accent); }
+  .rec-context em { font-style: normal; color: var(--green); font-weight: 600; }
+  .rec-context .neg { color: var(--red); font-weight: 600; }
+
+  .rec-action {
+    background: var(--bg-soft); border-radius: 6px;
+    padding: 8px 12px; font-size: 12px; color: var(--muted);
+    border-left: 2px solid var(--border);
+  }
+  .rec-action strong { color: var(--text); }
+  .rec-impact {
+    display: flex; gap: 12px; font-size: 11px; color: var(--muted);
+    margin-top: auto; padding-top: 8px;
+    border-top: 1px dashed var(--border);
+    flex-wrap: wrap;
+  }
+  .rec-impact .met { color: var(--text); font-weight: 600; }
+  .rec-impact a { color: var(--accent); text-decoration: none; }
+
+  .empty {
+    text-align: center; padding: 60px 20px; color: var(--muted);
+    background: var(--card); border: 1px dashed var(--border); border-radius: 12px;
+  }
+
+  .footnote { color: var(--muted); font-size: 12px; margin-top: 24px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <a href="index.html" style="font-weight: 600;">← Home</a>
+      <a href="explore.html">Explore</a>
+      <a href="timeline.html">Timeline</a>
+      <a href="projects.html">Projects</a>
+      <a href="improvements.html" style="color: var(--text);">Improvements</a>
+      <a href="plan.html">Plan</a>
+      <a href="tour.html">Story</a>
+      <a href="glossary.html">Glossary</a>
+      <span style="margin-left:auto; display:inline-flex; gap:8px; align-items:center;">
+        <span id="themeToggle"></span>
+        <span id="settings"></span>
+      </span>
+    </div>
+    <script>
+      ThemeToggle.mount("themeToggle");
+      Settings.mount("settings");
+    </script>
+
+    <h1>Improvements</h1>
+    <p class="subtitle" id="subtitle">Loading recommendations from your usage data…</p>
+
+    <div class="top-band" id="topBand"></div>
+
+    <div class="filter-bar">
+      <span class="label">Severity</span>
+      <button class="sev-btn active" data-sev="all">All</button>
+      <button class="sev-btn" data-sev="high">High</button>
+      <button class="sev-btn" data-sev="medium">Medium</button>
+      <button class="sev-btn" data-sev="low">Low</button>
+      <button class="sev-btn" data-sev="win">Wins</button>
+      <span class="label" style="margin-left: 16px;">Category</span>
+      <button class="cat-btn active" data-cat="all">All</button>
+      <button class="cat-btn" data-cat="cache">Cache</button>
+      <button class="cat-btn" data-cat="cost">Cost</button>
+      <button class="cat-btn" data-cat="tool">Tools</button>
+      <button class="cat-btn" data-cat="session">Sessions</button>
+      <button class="cat-btn" data-cat="plan">Plan</button>
+      <button class="cat-btn" data-cat="hygiene">Hygiene</button>
+      <span class="count" id="recCount"></span>
+    </div>
+
+    <div class="grid" id="recGrid"></div>
+    <p class="footnote">
+      Recommendations are generated client-side from <code>insights.json</code> and
+      <code>usage_history.json</code>. Each card explains the data finding and a
+      concrete action. See <a href="glossary.html">Glossary</a> for term definitions.
+    </p>
+  </div>
+
+<script>
+const fmtMoney = v => Currency.format(v);
+const fmtTok   = n => n >= 1e6 ? (n/1e6).toFixed(2) + "M" : n >= 1e3 ? (n/1e3).toFixed(1) + "K" : (n||0).toString();
+
+let RAW = null;        // insights.json
+let HISTORY = null;    // usage_history.json (gitignored, may be missing)
+let RECOMMENDATIONS = [];
+let SEV_FILTER = "all";
+let CAT_FILTER = "all";
+
+function loadAll() {
+  // insights_data.js shim is the primary source; usage_data.js is optional.
+  const s1 = document.createElement("script");
+  s1.src = "insights_data.js";
+  s1.onload = s1.onerror = () => {
+    RAW = window.INSIGHTS || null;
+    const s2 = document.createElement("script");
+    s2.src = "usage_data.js";
+    s2.onload = s2.onerror = () => {
+      HISTORY = window.USAGE_DATA || null;
+      build();
+    };
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s1);
+}
+
+// ── Recommendation builders ────────────────────────────────────────────────
+//
+// Each builder examines a slice of RAW (and optionally HISTORY) and pushes
+// {severity, category, title, context, action, impact, ref} cards. Builders
+// never throw — they bail silently on missing data so a partial dataset
+// degrades gracefully.
+
+function build() {
+  if (!RAW) {
+    document.getElementById("subtitle").textContent = "No data — run build_insights.py first.";
+    document.getElementById("topBand").innerHTML = "";
+    document.getElementById("recGrid").innerHTML = `<div class="empty">No insights data found.</div>`;
+    return;
+  }
+
+  RECOMMENDATIONS = [];
+  buildCacheHitRecs();
+  buildExpensiveProjects();
+  buildIdleSessions();
+  buildMcpHotspots();
+  buildModelMix();
+  buildContextBloat();
+  buildPlanFit();
+  buildHygieneRecs();
+  buildWins();
+
+  // Sort by severity then by impact (when present, descending).
+  const sevOrder = { high: 0, medium: 1, low: 2, win: 3 };
+  RECOMMENDATIONS.sort((a, b) => {
+    const s = (sevOrder[a.severity] ?? 4) - (sevOrder[b.severity] ?? 4);
+    if (s !== 0) return s;
+    return (b.impactSort || 0) - (a.impactSort || 0);
+  });
+
+  renderTopBand();
+  renderGrid();
+  document.getElementById("subtitle").textContent =
+    `${RECOMMENDATIONS.length} findings across ${RAW.byProject.length} projects, ${(RAW.totals.turns||0).toLocaleString()} turns.`;
+}
+
+function buildCacheHitRecs() {
+  // Projects with low cache hit ratios are good targets — low ratio = paying
+  // full input rate where caching could save 90% of those tokens.
+  const candidates = (RAW.byProject || [])
+    .filter(p => p.turns >= 10 && p.cost > 1 && p.cacheHitRatio < 0.7)
+    .sort((a, b) => a.cacheHitRatio - b.cacheHitRatio);
+
+  for (const p of candidates.slice(0, 5)) {
+    // Estimate savings: tokens being read fresh that COULD have been cached.
+    // Rough proxy: (1 - hitRatio) × cacheRead × inputRate × 0.9 ÷ 1e6.
+    // Use cost × (1 - hitRatio) × 0.5 as a simpler upper bound.
+    const potentialSaving = p.cost * (1 - p.cacheHitRatio) * 0.4;
+    RECOMMENDATIONS.push({
+      severity: p.cacheHitRatio < 0.5 ? "high" : "medium",
+      category: "cache",
+      title: `Low cache hit on ${p.name}`,
+      context: `<strong>${U.esc(p.name)}</strong> ran <em>${p.turns}</em> turns at <span class="neg">${(p.cacheHitRatio*100).toFixed(0)}% cache hit</span> — meaning most context is being re-read fresh each turn instead of pulled from cache.`,
+      action: `Check whether the session is restarting frequently or whether large files are being re-read. Adding a CLAUDE.md to keep context stable, or breaking long sessions earlier (so cache rebuilds happen during natural pauses), typically lifts hit ratio above 90%.`,
+      impact: { saved: potentialSaving, ref: "insights.html#projects" },
+      impactSort: potentialSaving,
+    });
+  }
+}
+
+function buildExpensiveProjects() {
+  // Top spend concentration — useful to know if one project is eating your budget.
+  const totalCost = (RAW.totals?.cost) || 0;
+  const top = (RAW.byProject || [])[0];
+  if (!top || totalCost <= 0) return;
+  const share = top.cost / totalCost;
+  if (share < 0.4) return;  // not concentrated enough to call out
+  RECOMMENDATIONS.push({
+    severity: share > 0.6 ? "high" : "medium",
+    category: "cost",
+    title: `${top.name} dominates spend`,
+    context: `<strong>${U.esc(top.name)}</strong> accounts for <em>${(share*100).toFixed(0)}%</em> of your API-equivalent cost (${fmtMoney(top.cost)} of ${fmtMoney(totalCost)}). Concentration this high makes one project's optimisation moves outsized — a small efficiency win there beats every other change.`,
+    action: `Run a cache-hit audit on this project specifically (Insights → Per-Project Detail). If the hit ratio is below 90% and the project is your daily driver, focus there first.`,
+    impact: { share: share, ref: `insights.html#projects` },
+    impactSort: top.cost,
+  });
+}
+
+function buildIdleSessions() {
+  // Sessions left open: long duration, few turns. Indicates terminal/window
+  // stayed open without active work — usually no real cost impact (no tokens
+  // billed for idle), but flags potential workflow noise.
+  const convs = RAW.conversations || [];
+  const idle = convs.filter(c =>
+    (c.turns || 0) > 0 && (c.turns || 0) < 20 &&
+    (c.durationMinutes || 0) > 60 * 24    // >24 h with <20 turns
+  ).sort((a, b) => (b.durationMinutes || 0) - (a.durationMinutes || 0));
+  if (!idle.length) return;
+  const top = idle[0];
+  const days = (top.durationMinutes / (60 * 24)).toFixed(1);
+  RECOMMENDATIONS.push({
+    severity: "low",
+    category: "session",
+    title: `Sessions left open for days`,
+    context: `Your longest near-idle session is <strong>${U.esc(top.name || top.sessionId.slice(0,8))}</strong> — <em>${days} days</em> wall-clock duration but only <em>${top.turns}</em> turns. ${idle.length > 1 ? `${idle.length - 1} other session(s) follow the same pattern.` : ""}`,
+    action: `No direct billing impact (idle time isn't billed) but consider <code>/clear</code> or closing terminals between work sessions — fresh sessions often get better cache hit ratios than reusing very stale contexts.`,
+    impact: { count: idle.length, ref: "insights.html#conversations" },
+    impactSort: idle.length,
+  });
+}
+
+function buildMcpHotspots() {
+  // MCP servers with disproportionate cost-per-call.
+  const servers = (RAW.byMCPServer || []).filter(m => m.invocations >= 10);
+  if (!servers.length) return;
+  // Cost per call
+  const ranked = servers.map(m => ({ ...m, cpc: m.approxCost / m.invocations }))
+    .sort((a, b) => b.cpc - a.cpc);
+  const top = ranked[0];
+  if (top.cpc < 0.05) return;  // < 5¢/call, not worth a card
+  RECOMMENDATIONS.push({
+    severity: top.cpc > 0.5 ? "medium" : "low",
+    category: "tool",
+    title: `${top.server} is expensive per call`,
+    context: `<strong>${U.esc(top.server)}</strong> averages <em>${fmtMoney(top.cpc)} per call</em> across ${top.invocations.toLocaleString()} invocations (${fmtMoney(top.approxCost)} total). High cost-per-call usually means each invocation pulls a lot of context.`,
+    action: `Check if you can call this tool less often or with narrower queries. MCP servers that fetch full datasets are common offenders.`,
+    impact: { cpc: top.cpc, total: top.approxCost, ref: "insights.html#mcp-subagents" },
+    impactSort: top.approxCost,
+  });
+}
+
+function buildModelMix() {
+  // Look for opportunity to use cheaper model for some workloads.
+  const models = RAW.byModel || [];
+  const opus  = models.filter(m => (m.model || "").includes("opus"));
+  const sonnet = models.filter(m => (m.model || "").includes("sonnet"));
+  const haiku = models.filter(m => (m.model || "").includes("haiku"));
+  const opusCost   = opus.reduce((s, m) => s + (m.cost || 0), 0);
+  const sonnetCost = sonnet.reduce((s, m) => s + (m.cost || 0), 0);
+  const haikuCost  = haiku.reduce((s, m) => s + (m.cost || 0), 0);
+  const total = opusCost + sonnetCost + haikuCost;
+  if (total <= 0) return;
+  const opusPct = opusCost / total;
+  if (opusPct > 0.85) {
+    RECOMMENDATIONS.push({
+      severity: "medium",
+      category: "cost",
+      title: `Heavy Opus usage (${(opusPct*100).toFixed(0)}%)`,
+      context: `Opus accounts for <em>${(opusPct*100).toFixed(0)}%</em> of your spend (${fmtMoney(opusCost)}). Opus is the right model for hard reasoning, but Sonnet handles most code edits at <em>roughly 1/8 the price</em>.`,
+      action: `For routine edits, doc updates, and tool-heavy work, Sonnet is usually fine. Reserve Opus for architecture decisions, debugging hard issues, or long-context analysis. Each session can pick its model independently.`,
+      impact: { saved: opusCost * 0.3, ref: "insights.html#roi" },
+      impactSort: opusCost,
+    });
+  }
+}
+
+function buildContextBloat() {
+  // Conversations with very high avg context per turn.
+  const convs = (RAW.conversations || []).filter(c => (c.turns || 0) >= 10);
+  if (!convs.length) return;
+  const ranked = convs
+    .map(c => ({ ...c, avgCtx: c.avgContextPerTurn || ((c.input || 0) + (c.cacheRead || 0)) / Math.max(1, c.turns) }))
+    .sort((a, b) => b.avgCtx - a.avgCtx);
+  const top = ranked[0];
+  if (top.avgCtx < 100_000) return;   // < 100K tokens/turn isn't notable
+  RECOMMENDATIONS.push({
+    severity: top.avgCtx > 300_000 ? "high" : "medium",
+    category: "session",
+    title: `Context bloat on ${top.name || "a session"}`,
+    context: `Session <strong>${U.esc(top.name || top.sessionId.slice(0,8))}</strong> averages <span class="neg">${fmtTok(top.avgCtx)} tokens per turn</span> across ${top.turns.toLocaleString()} turns. That's a lot of context being shipped each turn — even with caching, this drives up the per-turn fixed cost.`,
+    action: `Compress: extract a CLAUDE.md with the stable facts, drop the raw chat history that's no longer relevant, or split into a fresh session with a brief.`,
+    impact: { avgCtx: top.avgCtx, ref: "insights.html#conversations" },
+    impactSort: top.avgCtx,
+  });
+}
+
+function buildPlanFit() {
+  // Plan utilisation analysis (uses Plan.current()).
+  const plan = Plan.current();
+  const totals = HISTORY?.totals || {};
+  const daily = HISTORY?.daily || [];
+  if (plan.kind !== "subscription" || !plan.monthly || !daily.length) return;
+  const span = (new Date(daily[daily.length-1].date) - new Date(daily[0].date)) / 86400000 + 1;
+  const avgPerDay = (totals.totalCost || 0) / span;
+  const monthly = avgPerDay * 30.44;
+  const utilisation = monthly / plan.monthly;
+  if (utilisation < 0.5) {
+    RECOMMENDATIONS.push({
+      severity: "low",
+      category: "plan",
+      title: `${plan.name}: under-utilised`,
+      context: `You're projecting <em>${fmtMoney(monthly)}/mo</em> of API value on a <strong>${U.esc(plan.name)}</strong> plan (${fmtMoney(plan.monthly)}/mo). That's <em>${(utilisation*100).toFixed(0)}%</em> utilisation — roughly half your fee is buying headroom you may not be using.`,
+      action: `If your usage is steady, a smaller plan saves money. Run the Plan Optimizer to see breakeven points.`,
+      impact: { saved: (plan.monthly - monthly) * 12, ref: "whatif.html" },
+      impactSort: (plan.monthly - monthly) * 12,
+    });
+  } else if (utilisation > 1.0) {
+    RECOMMENDATIONS.push({
+      severity: "win",
+      category: "plan",
+      title: `${plan.name}: getting more than you pay for`,
+      context: `Projected monthly API value <em>${fmtMoney(monthly)}</em> exceeds your plan fee <strong>${fmtMoney(plan.monthly)}</strong> — utilisation <em>${(utilisation*100).toFixed(0)}%</em>. The flat fee is paying off vs API rates.`,
+      action: `Stay where you are — pay-as-you-go would cost you ${fmtMoney(monthly - plan.monthly)}/mo more.`,
+      impact: { gained: (monthly - plan.monthly) * 12, ref: "whatif.html" },
+      impactSort: (monthly - plan.monthly) * 12,
+    });
+  }
+}
+
+function buildHygieneRecs() {
+  // Worktree fan-out and dead-end project counts on this machine.
+  const wtRe = /^(.*?) \(wt: ([^)]+)\)$/;
+  const wtCounts = new Map();
+  for (const p of (RAW.byProject || [])) {
+    const m = wtRe.exec(p.name);
+    if (m) wtCounts.set(m[1], (wtCounts.get(m[1]) || 0) + 1);
+  }
+  const heaviestParent = [...wtCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (heaviestParent && heaviestParent[1] >= 3) {
+    RECOMMENDATIONS.push({
+      severity: "low",
+      category: "hygiene",
+      title: `${heaviestParent[1]} worktrees on ${heaviestParent[0]}`,
+      context: `Claude Code created <em>${heaviestParent[1]}</em> worktree directories under <strong>${U.esc(heaviestParent[0])}</strong>. Each worktree-as-session is fine, but stale ones clutter <code>.claude/worktrees/</code> and inflate the project list.`,
+      action: `<code>git worktree prune</code> in the parent repo, or delete the <code>.claude/worktrees/</code> entries you no longer need. The Projects roster will roll up automatically.`,
+      impact: { count: heaviestParent[1], ref: "projects.html" },
+      impactSort: heaviestParent[1],
+    });
+  }
+
+  // Dead-end count
+  const ref = (RAW.generatedAt || "").slice(0, 10);
+  if (ref) {
+    const cutoff = new Date(ref);
+    cutoff.setUTCDate(cutoff.getUTCDate() - 30);
+    const cutoffISO = cutoff.toISOString().slice(0, 10);
+    const dead = (RAW.byProject || []).filter(p =>
+      (p.cost || 0) < 1 || ((p.lastActivity || "").slice(0,10) < cutoffISO));
+    if (dead.length >= 5) {
+      RECOMMENDATIONS.push({
+        severity: "low",
+        category: "hygiene",
+        title: `${dead.length} dead-end projects`,
+        context: `<em>${dead.length}</em> projects in your roster are below $1 spend or have been idle &gt;30 days. They clutter the project filter in the Dashboard and the Roster.`,
+        action: `Use the Projects page's "Hide dead-ends" filter (already on by default) or remove the underlying <code>~/.claude/projects/&lt;slug&gt;/</code> directories you don't recognise.`,
+        impact: { count: dead.length, ref: "projects.html" },
+        impactSort: dead.length,
+      });
+    }
+  }
+}
+
+function buildWins() {
+  // Celebrate good signals.
+  const total = RAW.totals || {};
+  const overallHit = (total.cacheRead) / Math.max(1, (total.cacheRead + total.cacheCreate));
+  if (overallHit > 0.92) {
+    RECOMMENDATIONS.push({
+      severity: "win",
+      category: "cache",
+      title: `${(overallHit*100).toFixed(1)}% overall cache hit`,
+      context: `Across <em>${(total.turns||0).toLocaleString()}</em> turns and <em>${fmtTok(total.cacheRead)}</em> cache reads, your overall hit ratio is <strong>${(overallHit*100).toFixed(1)}%</strong>. That's the savings engine working. Without caching the same workload would have cost roughly <em>${fmtMoney(total.cost * 8)}</em>.`,
+      action: `Keep doing what you're doing. The <a href="insights.html#roi">Cache ROI table</a> shows exact savings per model.`,
+      impact: { hit: overallHit, ref: "insights.html#roi" },
+      impactSort: overallHit * 1000,
+    });
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+
+function renderTopBand() {
+  const total = RAW.totals || {};
+  const overallHit = total.cacheRead / Math.max(1, (total.cacheRead + total.cacheCreate));
+  const hi = RECOMMENDATIONS.filter(r => r.severity === "high").length;
+  const med = RECOMMENDATIONS.filter(r => r.severity === "medium").length;
+  const wins = RECOMMENDATIONS.filter(r => r.severity === "win").length;
+  // Estimate aggregate "potential annual saving" from cards that include it
+  const aggSaving = RECOMMENDATIONS.reduce((s, r) => s + (r.impact?.saved || 0), 0);
+
+  document.getElementById("topBand").innerHTML = `
+    <div class="stat">
+      <div class="label">Findings</div>
+      <div class="value">${RECOMMENDATIONS.length}</div>
+      <div class="sub">${hi} high · ${med} medium · ${wins} wins</div>
+    </div>
+    <div class="stat">
+      <div class="label">Potential savings</div>
+      <div class="value" style="color: var(--green);">${fmtMoney(aggSaving)}</div>
+      <div class="sub">est. annualised, conservative</div>
+    </div>
+    <div class="stat">
+      <div class="label">Overall cache hit</div>
+      <div class="value" style="color: ${overallHit > 0.85 ? 'var(--green)' : overallHit > 0.5 ? 'var(--amber)' : 'var(--red)'};">${(overallHit*100).toFixed(1)}%</div>
+      <div class="sub">${fmtTok(total.cacheRead)} reads / ${fmtTok(total.cacheCreate)} writes</div>
+    </div>
+    <div class="stat">
+      <div class="label">Projects scanned</div>
+      <div class="value">${(RAW.byProject || []).length}</div>
+      <div class="sub">${(RAW.totals?.turns || 0).toLocaleString()} total turns</div>
+    </div>
+  `;
+}
+
+function renderGrid() {
+  let visible = RECOMMENDATIONS;
+  if (SEV_FILTER !== "all") visible = visible.filter(r => r.severity === SEV_FILTER);
+  if (CAT_FILTER !== "all") visible = visible.filter(r => r.category === CAT_FILTER);
+
+  document.getElementById("recCount").textContent =
+    `Showing ${visible.length} of ${RECOMMENDATIONS.length}`;
+
+  if (!visible.length) {
+    document.getElementById("recGrid").innerHTML = `<div class="empty">No findings match these filters.</div>`;
+    return;
+  }
+
+  document.getElementById("recGrid").innerHTML = visible.map(r => {
+    const sev = r.severity;
+    const sevLabel = sev === "win" ? "Win" : sev[0].toUpperCase() + sev.slice(1);
+    const impactRow = renderImpact(r);
+    return `
+      <div class="rec ${U.escAttr(sev)}">
+        <div class="rec-head">
+          <div class="rec-title">${U.esc(r.title)}</div>
+          <div class="rec-pills">
+            <span class="pill pill-${U.escAttr(sev)}">${U.esc(sevLabel)}</span>
+            <span class="pill pill-cat">${U.esc(r.category)}</span>
+          </div>
+        </div>
+        <div class="rec-context">${r.context}</div>
+        <div class="rec-action"><strong>Try:</strong> ${r.action}</div>
+        ${impactRow}
+      </div>
+    `;
+  }).join("");
+}
+
+function renderImpact(r) {
+  const i = r.impact || {};
+  const parts = [];
+  if (i.saved && i.saved > 0)    parts.push(`<span>Save <span class="met">~${fmtMoney(i.saved)}/yr</span></span>`);
+  if (i.gained && i.gained > 0)  parts.push(`<span>Gained <span class="met">~${fmtMoney(i.gained)}/yr</span></span>`);
+  if (i.share != null)           parts.push(`<span>Share of spend <span class="met">${(i.share*100).toFixed(0)}%</span></span>`);
+  if (i.cpc != null)             parts.push(`<span>Per-call <span class="met">${fmtMoney(i.cpc)}</span></span>`);
+  if (i.avgCtx != null)          parts.push(`<span>Avg context <span class="met">${fmtTok(i.avgCtx)}</span></span>`);
+  if (i.count != null)           parts.push(`<span>Count <span class="met">${i.count}</span></span>`);
+  if (i.hit != null)             parts.push(`<span>Hit ratio <span class="met">${(i.hit*100).toFixed(1)}%</span></span>`);
+  if (i.ref)                     parts.push(`<a href="${U.escAttr(i.ref)}">View →</a>`);
+  return parts.length ? `<div class="rec-impact">${parts.join("")}</div>` : "";
+}
+
+// Filter button wiring
+document.querySelectorAll(".sev-btn").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".sev-btn").forEach(x => x.classList.toggle("active", x === b));
+  SEV_FILTER = b.dataset.sev;
+  renderGrid();
+}));
+document.querySelectorAll(".cat-btn").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".cat-btn").forEach(x => x.classList.toggle("active", x === b));
+  CAT_FILTER = b.dataset.cat;
+  renderGrid();
+}));
+
+// Re-render on currency / plan changes (cards reference both)
+Settings.onChange(build);
+
+loadAll();
+</script>
+</body>
+</html>

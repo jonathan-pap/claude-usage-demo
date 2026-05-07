@@ -1,0 +1,14 @@
+# Everything here is intentionally committed for the demo.
+# (In a real deployment these would be gitignored and generated locally.)
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp
+
+# Python
+__pycache__/
+*.pyc

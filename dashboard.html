@@ -1,0 +1,1276 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script>window.location.replace("explore.html#charts");</script>
+<title>Claude Code Usage Dashboard</title>
+<link rel="stylesheet" href="themes.css" />
+<script src="util.js"></script>
+<script src="theme.js"></script>
+<script src="currency.js"></script>
+<script src="tzmode.js"></script>
+<script src="plan.js"></script>
+<script src="settings.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>
+  /* Theme tokens come from themes.css; only add layout/utility styles below */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 24px;
+    margin-bottom: 4px;
+  }
+  .subtitle { color: var(--muted); margin-bottom: 24px; font-size: 14px; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-left: 6px;
+  }
+  .badge.cli { background: rgba(96, 165, 250, 0.2); color: #60a5fa; }
+  .badge.cowork { background: rgba(244, 114, 182, 0.2); color: #f472b6; }
+  .grid-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .grid-charts {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .grid-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .grid-charts, .grid-bottom { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .kpi .label {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .kpi .value {
+    font-size: 26px;
+    font-weight: 600;
+  }
+  .kpi .sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .card h2 {
+    font-size: 14px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    font-weight: 500;
+  }
+  .chart-wrap { position: relative; height: 280px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .ratio-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .ratio-bar > div {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--blue));
+  }
+  .legend-inline {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .legend-inline .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+  <h1>Claude Code Usage Dashboard</h1>
+  <p class="subtitle" id="subtitleHeader">Includes <strong>CLI</strong> and <strong>Cowork (desktop)</strong> sessions across every machine</p>
+  <div id="machineBanner" style="margin-bottom: 16px;"></div>
+  <script src="machines/manifest.js" onerror="this.remove()"></script>
+  <script>
+    (function () {
+      function paint(m) {
+        if (!m || !m.machines || !m.machines.length) return;
+        const totalCost = m.machines.reduce((s, x) => s + (x.totalCost || 0), 0);
+        const list = m.machines.map(x => `<span style="color: var(--text); margin-right:14px;">${U.esc(x.machine)} <span style="color:var(--muted);">(${fmtMoney(x.totalCost)})</span></span>`).join("");
+        document.getElementById("machineBanner").innerHTML = `
+          <div style="background: rgba(96, 165, 250, 0.08); border: 1px solid rgba(96, 165, 250, 0.3); border-radius: 8px; padding: 12px 16px; font-size: 13px;">
+            <strong style="color: #60a5fa;">Multi-machine sync:</strong>
+            <span style="color: var(--muted);">${m.machineCount} machine(s) — combined ${fmtMoney(totalCost)}.</span>
+            <div style="margin-top: 6px;">${list}</div>
+          </div>
+        `;
+      }
+      if (window.MACHINES_MANIFEST) { paint(window.MACHINES_MANIFEST); return; }
+      fetch("machines/manifest.json").then(r => r.ok ? r.json() : null).then(paint).catch(() => {});
+    })();
+  </script>
+  <div class="nav" style="margin-bottom: 24px; font-size: 13px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+    <a href="index.html" style="color: var(--accent); text-decoration: none; font-weight: 600;">← Home</a>
+    <a href="dashboard.html" style="color: var(--text); text-decoration: none;">Dashboard</a>
+    <a href="timeline.html" style="color: var(--accent); text-decoration: none;">Timeline</a>
+    <a href="insights.html" style="color: var(--accent); text-decoration: none;">Insights</a>
+    <a href="projects.html" style="color: var(--accent); text-decoration: none;">Projects</a>
+    <a href="improvements.html" style="color: var(--accent); text-decoration: none;">Improvements</a>
+    <a href="pricing.html" style="color: var(--accent); text-decoration: none;">Pricing</a>
+    <a href="whatif.html" style="color: var(--accent); text-decoration: none;">What-If</a>
+    <a href="tour.html">Story</a>
+    <a href="glossary.html" style="color: var(--accent); text-decoration: none;">Glossary</a>
+    <span style="margin-left:auto; display:inline-flex; gap:8px; align-items:center;">
+      <span id="themeToggle"></span>
+      <span id="settings"></span>
+    </span>
+  </div>
+  <script>
+    ThemeToggle.mount("themeToggle");
+    Settings.mount("settings");
+  </script>
+
+  <div id="dateFilter"></div>
+  <script src="date_filter.js"></script>
+  <script src="usage_data.js" onerror="this.remove()"></script>
+  <!-- insights_data.js drives live model + session tables; loaded sync.
+       Heavy users may see ~500ms first-paint impact; index.html / projects /
+       timeline lazy-load it instead. Splitting build_insights into a small
+       summary + lazy detail would address this everywhere — future work. -->
+  <script src="insights_data.js" onerror="this.remove()"></script>
+
+  <div class="grid-kpis" id="kpiGrid"></div>
+
+  <div class="grid-charts">
+    <div class="card">
+      <h2>Daily Cost</h2>
+      <div class="legend-inline">
+        <span><span class="dot" style="background:#60a5fa;"></span>CLI</span>
+        <span><span class="dot" style="background:#f472b6;"></span>Cowork</span>
+      </div>
+      <div class="chart-wrap"><canvas id="costChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Token Composition</h2>
+      <div class="chart-wrap"><canvas id="compositionChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-bottom">
+    <div class="card">
+      <h2>Daily Tokens (Stacked)</h2>
+      <div class="chart-wrap"><canvas id="tokensChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Cache Hit Ratio per Day</h2>
+      <div class="chart-wrap"><canvas id="hitRatioChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-bottom" style="margin-top: 24px;">
+    <div class="card">
+      <h2>Cost by Model</h2>
+      <div class="chart-wrap"><canvas id="modelChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Cost: CLI vs Cowork</h2>
+      <div class="chart-wrap"><canvas id="sourceChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 24px;">
+    <h2>Cost by Model &amp; Pricing Tier <span style="font-size: 10px; color: var(--muted); background: var(--card-hi); padding: 2px 8px; border-radius: 999px; margin-left: 8px;">all-time, this machine</span></h2>
+    <p style="color: var(--muted); font-size: 12px; margin-bottom: 12px;">
+      Standard = current API pricing (what you were billed). Batch = same workload via Batch API (50% off all token types, 24h async SLA, not used by Claude Code).
+      Prompt-caching savings are already baked into Standard — see "Caching saved" column.
+      This card is a lifetime pricing comparison and does <em>not</em> react to the Date / Machine / Project filters.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th class="num">Input</th>
+          <th class="num">Output</th>
+          <th class="num">Cache Write</th>
+          <th class="num">Cache Read</th>
+          <th class="num">Standard $</th>
+          <th class="num">Batch (50% off) $</th>
+          <th class="num">No-Cache Hypothetical $</th>
+          <th class="num">Caching Saved</th>
+        </tr>
+      </thead>
+      <tbody id="modelPricingBody"></tbody>
+      <tfoot id="modelPricingFoot"></tfoot>
+    </table>
+  </div>
+
+  <div class="grid-bottom" style="margin-top: 24px;">
+    <div class="card">
+      <h2>Cost by Model — Pricing Tier Comparison <span style="font-size: 10px; color: var(--muted); background: var(--card-hi); padding: 2px 8px; border-radius: 999px; margin-left: 8px;">all-time</span></h2>
+      <div class="chart-wrap"><canvas id="tierChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>Caching Savings vs No-Cache <span style="font-size: 10px; color: var(--muted); background: var(--card-hi); padding: 2px 8px; border-radius: 999px; margin-left: 8px;">all-time</span></h2>
+      <div class="chart-wrap"><canvas id="cacheSavingsChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 24px;">
+    <h2>Sessions</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Session</th>
+          <th>Source</th>
+          <th>Models</th>
+          <th class="num">Total Tokens</th>
+          <th class="num">Hit Ratio</th>
+          <th class="num">Cost</th>
+        </tr>
+      </thead>
+      <tbody id="sessionBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card" style="margin-top: 24px;">
+    <h2>Daily Breakdown</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Models</th>
+          <th class="num">Input</th>
+          <th class="num">Output</th>
+          <th class="num">Cache Create</th>
+          <th class="num">Cache Read</th>
+          <th class="num">Total Tokens</th>
+          <th class="num">Hit Ratio</th>
+          <th class="num">Cost</th>
+        </tr>
+      </thead>
+      <tbody id="dailyBody"></tbody>
+      <tfoot id="dailyFoot"></tfoot>
+    </table>
+  </div>
+
+<script>
+// ── Shared helpers ────────────────────────────────────────────────────────
+// Currency-aware money formatter (Currency.format honours USD/EUR + rate)
+const fmtMoney  = (usd, decimals=2) => Currency.format(usd, { decimals });
+const fmtMoney4 = (usd) => Currency.format(usd, { decimals: 4 });
+
+// One pass over a daily[] returning every sum the renderers need. Saves ~5
+// reduce() calls per filter change and keeps the per-day field names in one
+// place. Pass `dailyData` (filtered) or `ALL_DAILY` (unfiltered).
+function sumDaily(rows) {
+  const t = { cost: 0, cli: 0, cowork: 0, total: 0,
+              input: 0, output: 0, cacheCreate: 0, cacheRead: 0,
+              days: 0, peak: null };
+  for (const d of rows) {
+    t.cost        += d.cost        || 0;
+    t.cli         += d.cliCost     || 0;
+    t.cowork      += d.coworkCost  || 0;
+    t.total       += d.total       || 0;
+    t.input       += d.input       || 0;
+    t.output      += d.output      || 0;
+    t.cacheCreate += d.cacheCreate || 0;
+    t.cacheRead   += d.cacheRead   || 0;
+    t.days       += 1;
+    if (!t.peak || (d.cost || 0) > (t.peak.cost || 0)) t.peak = d;
+  }
+  t.hitRatio = (t.cacheRead + t.cacheCreate) > 0
+    ? t.cacheRead / (t.cacheRead + t.cacheCreate)
+    : 0;
+  return t;
+}
+
+// Replace every "destroyChart(id); new Chart(getElementById(id), cfg)" with
+// makeChart(id, cfg). Returns the new instance for any caller that needs it.
+function makeChart(id, cfg) {
+  destroyChart(id);
+  const el = document.getElementById(id);
+  if (!el) return null;
+  return new Chart(el, cfg);
+}
+
+// Common chart option defaults — every dashboard chart uses these.
+// Override via spread when a chart needs different scales/plugins.
+const chartOpts = {
+  responsive: true,
+  maintainAspectRatio: false,
+};
+
+// Load from usage_data.js shim (window.USAGE_DATA). When the shim is missing
+// (no update_usage.sh run yet on this machine), surface a clear empty state
+// rather than rendering hardcoded sample data the viewer might mistake for
+// their own.
+function reshapeUsage(u) {
+  return (u.daily || []).map(d => ({
+    date: d.date,
+    input: d.inputTokens || 0,
+    output: d.outputTokens || 0,
+    cacheCreate: d.cacheCreationTokens || 0,
+    cacheRead: d.cacheReadTokens || 0,
+    total: d.totalTokens || 0,
+    cost: d.totalCost || 0,
+    cliCost: d.cliCost || 0,
+    coworkCost: d.coworkCost || 0,
+    models: (d.models || []).join(", "),
+  }));
+}
+
+// Reshape a per-machine snapshot file into the dashboard's daily row shape.
+function reshapeMachine(snap) {
+  return (snap.daily || []).map(d => ({
+    date: d.date,
+    input: d.inputTokens || 0,
+    output: d.outputTokens || 0,
+    cacheCreate: d.cacheCreationTokens || 0,
+    cacheRead: d.cacheReadTokens || 0,
+    total: d.totalTokens || 0,
+    cost: d.totalCost || 0,
+    cliCost: d.cliCost || 0,
+    coworkCost: d.coworkCost || 0,
+    models: (d.models || []).join(", "),
+  }));
+}
+
+const LOCAL_DAILY = (window.USAGE_DATA && window.USAGE_DATA.daily && window.USAGE_DATA.daily.length)
+  ? reshapeUsage(window.USAGE_DATA)
+  : [];
+if (!LOCAL_DAILY.length) {
+  document.getElementById("subtitleHeader").innerHTML =
+    `<span style="color: var(--amber);">No data on this machine yet.</span> Run <code>bash update_usage.sh</code> to populate.`;
+}
+
+// Sum per-machine rows into a single daily series. When MACHINES_DAILY is
+// loaded this is the authoritative source for 'all machines'; before that
+// we fall back to LOCAL_DAILY (this machine only).
+function mergeMachines(byHost) {
+  const byDate = new Map();
+  for (const rows of Object.values(byHost)) {
+    for (const r of rows) {
+      const cur = byDate.get(r.date) || {
+        date: r.date, input: 0, output: 0, cacheCreate: 0, cacheRead: 0,
+        total: 0, cost: 0, cliCost: 0, coworkCost: 0, models: "",
+      };
+      cur.input += r.input; cur.output += r.output;
+      cur.cacheCreate += r.cacheCreate; cur.cacheRead += r.cacheRead;
+      cur.total += r.total; cur.cost += r.cost;
+      cur.cliCost += r.cliCost; cur.coworkCost += r.coworkCost;
+      // Keep models as the union (deduped, comma-joined).
+      const merged = new Set([
+        ...(cur.models ? cur.models.split(", ") : []),
+        ...(r.models   ? r.models.split(", ")   : [])
+      ].filter(Boolean));
+      cur.models = [...merged].join(", ");
+      byDate.set(r.date, cur);
+    }
+  }
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ALL_DAILY is what the dashboard renders against. Updated to merged
+// cross-machine totals once snapshots load; defaults to local for safety.
+let ALL_DAILY = LOCAL_DAILY.slice();
+let dailyData = ALL_DAILY.slice();
+
+// Filter state — driven by the extras in the sticky date filter bar.
+let CURRENT_PROJECT = "all";
+let CURRENT_SOURCE  = "all";
+let CURRENT_MACHINE = "all";  // "all" or a host slug from machines/manifest
+let LAST_DATE_RANGE = { startISO: null, endISO: null };
+let INSIGHTS_FOR_FILTER = null;
+let MACHINES_DAILY = null;     // {host: [reshaped daily rows]} once loaded
+let LOCAL_HOST     = null;     // this machine's hostname slug (auto-detected)
+
+// Worktree detection: build_insights tags Claude Code worktrees as
+// "<parent> (wt: <branch>)". When the user picks "<parent>" in the project
+// filter we want the rolled-up total, so we match the parent name OR any of
+// its worktree variants.
+const WT_RE = /^(.*?) \(wt: ([^)]+)\)$/;
+function projectMatchesFilter(name, filter) {
+  if (filter === "all") return true;
+  if (name === filter) return true;
+  // Match any worktree whose parent equals the filter name.
+  const m = WT_RE.exec(name);
+  return !!(m && m[1] === filter);
+}
+
+// Build a daily series filtered by project + source.
+//
+// Important reconciliation: the dashboard's totals come from usage_history.json
+// (ccusage CLI's pricing). Project / source breakdowns live in insights.json
+// (parsed JSONLs with our own pricing). The two have meaningfully different
+// totals — insights tends to be ~2x higher for some workloads. To keep the
+// filter consistent with the unfiltered KPIs, we use insights only to derive
+// per-project SHARES of each day, then apply those shares to the ccusage
+// daily total so a project's filtered cost can never exceed the day's true
+// dashboard total.
+function computeFilteredDaily() {
+  let base;
+  if (CURRENT_PROJECT === "all" || !INSIGHTS_FOR_FILTER) {
+    base = ALL_DAILY.map(d => ({ ...d }));
+  } else {
+    const trend = (INSIGHTS_FOR_FILTER.dailyTrend || []);
+    const allByDate = new Map(ALL_DAILY.map(d => [d.date, d]));
+    const out = [];
+    let skipped = 0, skippedCost = 0;
+    RECONCILE_GAP = { skipped: 0, skippedCost: 0 };
+    for (const d of trend) {
+      const ccDay = allByDate.get(d.date);
+      if (!ccDay) {
+        // Insights has data for this day but ccusage doesn't — happens when
+        // the JSONL parser counted turns ccusage's pricing tables don't cover
+        // (rare). Track and surface so the user knows the filtered total
+        // can disagree with their unfiltered intuition.
+        const projHere = Object.entries(d.byProject || {})
+          .filter(([n]) => projectMatchesFilter(n, CURRENT_PROJECT))
+          .reduce((s, [, c]) => s + c, 0);
+        if (projHere > 0) { skipped += 1; skippedCost += projHere; }
+        continue;
+      }
+      const byProject = d.byProject || {};
+      const detail    = d.projectsDetail || {};
+      let projInsightsCost = 0, cliShareNum = 0, coworkShareNum = 0;
+      let input = 0, output = 0, cacheCreate = 0, cacheRead = 0, turns = 0;
+      const dayInsightsCli    = (d.bySource || {}).cli    || 0;
+      const dayInsightsCowork = (d.bySource || {}).cowork || 0;
+      const dayInsightsTotal  = dayInsightsCli + dayInsightsCowork || 0;
+      for (const [name, cost] of Object.entries(byProject)) {
+        if (!projectMatchesFilter(name, CURRENT_PROJECT)) continue;
+        projInsightsCost += cost;
+        const pd = detail[name];
+        if (pd && pd.bySource) {
+          cliShareNum    += pd.bySource.cli    || 0;
+          coworkShareNum += pd.bySource.cowork || 0;
+        } else if (dayInsightsTotal > 0) {
+          cliShareNum    += cost * dayInsightsCli    / dayInsightsTotal;
+          coworkShareNum += cost * dayInsightsCowork / dayInsightsTotal;
+        }
+        if (pd) {
+          input       += pd.input       || 0;
+          output      += pd.output      || 0;
+          cacheCreate += pd.cacheCreate || 0;
+          cacheRead   += pd.cacheRead   || 0;
+          turns       += pd.turns       || 0;
+        }
+      }
+      if (projInsightsCost <= 0) continue;
+
+      // Day-level insights total across ALL projects (= cli + cowork sum)
+      const insightsDayTotal = dayInsightsTotal || projInsightsCost;
+      // Scale project share into ccusage's day total so the unit matches
+      // what the unfiltered dashboard shows.
+      const shareTotal = projInsightsCost / insightsDayTotal;
+      const ccTotal    = ccDay.cost || 0;
+      const projCost   = +(ccTotal * shareTotal).toFixed(4);
+      // For source split, scale the per-source insights numerators against
+      // ccusage's per-source columns so cliCost + coworkCost still equals
+      // projCost (and matches ccusage's accounting on each side).
+      const insightsCliTotal    = dayInsightsCli;
+      const insightsCoworkTotal = dayInsightsCowork;
+      const projCli    = insightsCliTotal    > 0 ? +(ccDay.cliCost    * (cliShareNum    / insightsCliTotal   )).toFixed(4) : 0;
+      const projCowork = insightsCoworkTotal > 0 ? +(ccDay.coworkCost * (coworkShareNum / insightsCoworkTotal)).toFixed(4) : 0;
+      out.push({
+        date: d.date,
+        input, output, cacheCreate, cacheRead,
+        total: input + output + cacheCreate + cacheRead,
+        cost: projCost,
+        cliCost:    projCli,
+        coworkCost: projCowork,
+        models: "",
+      });
+    }
+    base = out;
+    RECONCILE_GAP = { skipped, skippedCost };
+  }
+  // Source filter: zero-out the discarded side and recompute cost.
+  if (CURRENT_SOURCE === "cli") {
+    base = base.map(d => ({ ...d, cost: d.cliCost,    coworkCost: 0 }));
+  } else if (CURRENT_SOURCE === "cowork") {
+    base = base.map(d => ({ ...d, cost: d.coworkCost, cliCost:    0 }));
+  }
+  return base;
+}
+
+// Track and expose the insights/ccusage day gap for transparency.
+let RECONCILE_GAP = { skipped: 0, skippedCost: 0 };
+
+function applyAllFilters() {
+  const all = computeFilteredDaily();
+  dailyData = all.filter(d => DateFilter.inRange(d.date, LAST_DATE_RANGE.startISO, LAST_DATE_RANGE.endISO));
+  renderKPIs();
+  renderTimeSeriesCharts();
+  renderDailyTable();
+  renderReconcileNote();
+  if (typeof renderSourceChart   === "function") renderSourceChart();
+  if (typeof renderSessionTable  === "function") renderSessionTable();
+  if (typeof renderModelChart    === "function") renderModelChart();
+}
+
+function renderReconcileNote() {
+  let host = document.getElementById("reconcileNote");
+  if (!host) {
+    const insertBefore = document.querySelector(".grid-kpis");
+    if (!insertBefore) return;
+    host = document.createElement("div");
+    host.id = "reconcileNote";
+    host.style.cssText = "margin-bottom: 16px;";
+    insertBefore.insertAdjacentElement("afterend", host);
+  }
+  if (CURRENT_PROJECT === "all" || RECONCILE_GAP.skipped === 0) {
+    host.innerHTML = "";
+    return;
+  }
+  host.innerHTML = `
+    <div style="background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--muted);">
+      <strong style="color: var(--amber);">Note:</strong>
+      Skipped ${RECONCILE_GAP.skipped} day(s) where insights had data but ccusage didn't —
+      ~${Currency.format(RECONCILE_GAP.skippedCost)} of project cost not reflected in this filter.
+    </div>
+  `;
+}
+
+function loadInsightsForFilter() {
+  // Lazy-load insights once so the project list and per-project slicing work.
+  if (INSIGHTS_FOR_FILTER) return Promise.resolve(INSIGHTS_FOR_FILTER);
+  if (window.INSIGHTS) { INSIGHTS_FOR_FILTER = window.INSIGHTS; return Promise.resolve(window.INSIGHTS); }
+  return new Promise(res => {
+    const s = document.createElement("script");
+    s.src = "insights_data.js";
+    s.onload = s.onerror = () => {
+      INSIGHTS_FOR_FILTER = window.INSIGHTS || null;
+      res(INSIGHTS_FOR_FILTER);
+    };
+    document.head.appendChild(s);
+  });
+}
+
+// Sample / placeholder data — used only when insights.json hasn't been built
+// yet on this machine. The "Top sessions" and "Cost by Model" cards mark
+// themselves as sample below so viewers don't mistake these for live numbers.
+const SAMPLE_SESSION_DATA = [
+  { session: "report-mcp",          source: "CLI",    models: "opus-4-6",    total: 24542000, cacheRead: 22991000, cacheCreate: 1519400, cost: 21.76 },
+  { session: "wizardly-darwin",     source: "Cowork", models: "opus-4-7",    total: 13581000, cacheRead: 12813000, cacheCreate: 629817,  cost: 13.79 },
+  { session: "tmdl-generator",      source: "CLI",    models: "opus-4-7",    total: 1048500,  cacheRead: 985013,   cacheCreate: 46116,   cost: 1.21 },
+];
+const SAMPLE_MODEL_TOTALS = {
+  "opus-4-6":   { tokens: 25005850, cost: 24.40 },
+  "opus-4-7":   { tokens: 17669434, cost: 17.90 },
+  "sonnet-4-6": { tokens: 3312810,  cost: 1.89 },
+  "haiku-4-5":  { tokens: 219629,   cost: 0.13 },
+};
+const SAMPLE_MODEL_PRICING = [
+  { model: "opus-4-6",   input: 3271, output: 43524,  cacheWrite: 1880660, cacheRead: 23078895, standard: 24.3980 },
+  { model: "opus-4-7",   input: 377,  output: 187509, cacheWrite: 778079,  cacheRead: 16703469, standard: 17.9043 },
+  { model: "sonnet-4-6", input: 114,  output: 20831,  cacheWrite: 170026,  cacheRead: 3121839,  standard: 1.8870 },
+  { model: "haiku-4-5",  input: 1336, output: 5,      cacheWrite: 88960,   cacheRead: 129328,   standard: 0.1255 },
+];
+
+// Build live versions from insights when available — falls back to samples
+// (and surfaces a warning) when this machine hasn't run build_insights yet.
+function buildLiveModelData() {
+  const ins = window.INSIGHTS;
+  if (!ins || !ins.byModel || !ins.byModel.length) {
+    document.getElementById("subtitleHeader").insertAdjacentHTML("beforeend",
+      ` <span style="color: var(--amber); font-size: 11px;">(model & session tables show sample data — run build_insights.py for live)</span>`);
+    return { sessionData: SAMPLE_SESSION_DATA, modelTotals: SAMPLE_MODEL_TOTALS, modelPricing: SAMPLE_MODEL_PRICING };
+  }
+  const modelTotals = {};
+  const modelPricing = ins.byModel.map(m => {
+    const short = (m.model || "").replace("claude-", "").replace(/-\d{8}$/, "");
+    modelTotals[short] = { tokens: (m.input || 0) + (m.output || 0) + (m.cacheCreate || 0) + (m.cacheRead || 0), cost: m.cost || 0 };
+    return {
+      model: short,
+      input: m.input || 0,
+      output: m.output || 0,
+      cacheWrite: m.cacheCreate || 0,
+      cacheRead:  m.cacheRead   || 0,
+      standard:   m.cost || 0,
+    };
+  });
+  const sessionData = ((ins.conversations || []).slice(0, 9)).map(c => ({
+    session: c.name || (c.sessionId || "").slice(0, 12),
+    source:  (c.source || "CLI").toUpperCase() === "CLI" ? "CLI" : "Cowork",
+    models:  (c.model || "").replace("claude-", "").replace(/-\d{8}$/, ""),
+    total:   c.totalTokens || 0,
+    cacheRead:   c.cacheRead   || 0,
+    cacheCreate: c.cacheCreate || 0,
+    cost:    c.cost || 0,
+  }));
+  return { sessionData, modelTotals, modelPricing };
+}
+const __live = buildLiveModelData();
+const sessionData  = __live.sessionData;
+const modelTotals  = __live.modelTotals;
+const modelPricing = __live.modelPricing;
+
+// Implied per-token rate from ccusage's reported standard cost (back-derived).
+// We then compute "no-cache hypothetical" by repricing cache_read tokens at the
+// effective input rate (since without caching they'd be regular input tokens).
+// Effective input rate = standard cost attributed to non-cache-read components,
+// solved per model. For simplicity: cache_read price ≈ 10% of input price (Anthropic
+// public ratio), so we use that ratio to extrapolate.
+//
+// noCacheCost = standard + cache_read * (input_rate - cache_read_rate)
+//             = standard + cache_read * input_rate * 0.9
+// We approximate input_rate by dividing the non-cache-read portion of cost by tokens.
+//
+// NOTE: this mirrors build_insights.py's `cache_saved` formula (the Python
+// version uses precise per-family input rates from the RATES table). When
+// pricing dimensions need to change, update BOTH paths (this function and
+// the `cacheSaved` calc in build_insights.py) so insights.json and the
+// dashboard's pricing-tier table never drift.
+function pricingDerivedRow(p) {
+  const totalTokens = p.input + p.output + p.cacheWrite + p.cacheRead;
+  const batch = p.standard * 0.5;
+  // Anthropic's public ratio: cache_read = 10% of input price.
+  // So if cache_read contributes X to standard cost, the no-cache equivalent is 10X.
+  // We estimate cache_read's share of standard cost using its share of "weighted tokens",
+  // where weights ≈ (input:1, output:5, cacheWrite:1.25, cacheRead:0.1) per Anthropic's public ratios.
+  const weighted = p.input * 1.0 + p.output * 5.0 + p.cacheWrite * 1.25 + p.cacheRead * 0.1;
+  const cacheReadShare = (p.cacheRead * 0.1) / weighted;
+  const cacheReadCost = p.standard * cacheReadShare;
+  const noCacheCost = p.standard - cacheReadCost + (cacheReadCost * 10);  // 10x because input is 10x cache_read
+  return { totalTokens, batch, noCacheCost, cacheSaved: noCacheCost - p.standard };
+}
+
+const fmt = n => n.toLocaleString();
+const fmtT = n => n >= 1e6 ? (n/1e6).toFixed(2) + 'M' : n >= 1e3 ? (n/1e3).toFixed(1) + 'K' : n;
+
+// Render the daily breakdown table from dailyData (rebuilt on filter change)
+function renderDailyTable() {
+  const tbody = document.getElementById('dailyBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  dailyData.forEach(d => {
+    const hit = d.cacheRead + d.cacheCreate > 0
+      ? (d.cacheRead / (d.cacheRead + d.cacheCreate) * 100).toFixed(1)
+      : '0.0';
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${U.esc(d.date)}</td>
+        <td style="color: var(--muted);">${U.esc(d.models)}</td>
+        <td class="num">${fmt(d.input)}</td>
+        <td class="num">${fmt(d.output)}</td>
+        <td class="num">${fmt(d.cacheCreate)}</td>
+        <td class="num">${fmt(d.cacheRead)}</td>
+        <td class="num">${fmt(d.total)}</td>
+        <td class="num" style="color: var(--green);">${hit}%</td>
+        <td class="num">${fmtMoney(d.cost)}</td>
+      </tr>
+    `);
+  });
+  // Footer totals (filtered) — populated only by JS, never hardcoded.
+  const tfoot = document.getElementById('dailyFoot');
+  if (tfoot) {
+    const t = sumDaily(dailyData);
+    const hit = (t.hitRatio * 100).toFixed(2);
+    tfoot.innerHTML = `
+      <tr style="font-weight: 600;">
+        <td>Total (${t.days} days)</td>
+        <td>—</td>
+        <td class="num">${fmt(t.input)}</td>
+        <td class="num">${fmt(t.output)}</td>
+        <td class="num">${fmt(t.cacheCreate)}</td>
+        <td class="num">${fmt(t.cacheRead)}</td>
+        <td class="num">${fmt(t.total)}</td>
+        <td class="num" style="color: var(--green);">${hit}%</td>
+        <td class="num">${fmtMoney(t.cost)}</td>
+      </tr>
+    `;
+  }
+}
+renderDailyTable();
+
+// Session table — derived from insights.conversations, narrowed to the
+// active date range so it reacts to the date filter. We can't apply
+// the machine filter here because conversations don't carry a host
+// (only this machine's insights.json is loaded). Same for project
+// filter — sessions are per-sessionId, not per-project.
+function renderSessionTable() {
+  const sbody = document.getElementById('sessionBody');
+  if (!sbody) return;
+  let convs;
+  if (window.INSIGHTS && Array.isArray(window.INSIGHTS.conversations)) {
+    const inDate = (ts) => DateFilter.inRange((ts || "").slice(0, 10),
+                                              LAST_DATE_RANGE.startISO,
+                                              LAST_DATE_RANGE.endISO);
+    convs = window.INSIGHTS.conversations
+      .filter(c => inDate(c.lastActivity || c.firstActivity || ""))
+      .slice()
+      .sort((a, b) => (b.cost || 0) - (a.cost || 0))
+      .slice(0, 9);
+  } else {
+    convs = sessionData;
+  }
+  sbody.innerHTML = '';
+  for (const c of convs) {
+    const cacheRead   = c.cacheRead   ?? 0;
+    const cacheCreate = c.cacheCreate ?? 0;
+    const denom = cacheRead + cacheCreate;
+    const hit = denom > 0 ? (cacheRead / denom * 100).toFixed(1) : '0.0';
+    const sourceLabel = (c.source || "").toUpperCase() === "CLI" ? "CLI" : "Cowork";
+    const badgeClass = sourceLabel === 'CLI' ? 'cli' : 'cowork';
+    const sessionLabel = c.session ?? c.name ?? (c.sessionId || "").slice(0, 12);
+    const modelsLabel  = c.models ?? (c.model || "").replace("claude-", "").replace(/-\d{8}$/, "");
+    const totalTokens  = c.total ?? c.totalTokens ?? 0;
+    sbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${U.esc(sessionLabel)}</td>
+        <td><span class="badge ${badgeClass}">${U.esc(sourceLabel)}</span></td>
+        <td style="color: var(--muted);">${U.esc(modelsLabel)}</td>
+        <td class="num">${fmtT(totalTokens)}</td>
+        <td class="num" style="color: var(--green);">${hit}%</td>
+        <td class="num">${fmtMoney(c.cost || 0)}</td>
+      </tr>
+    `);
+  }
+}
+renderSessionTable();
+
+Chart.defaults.color = '#8a93a3';
+Chart.defaults.borderColor = '#2a3441';
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+function destroyChart(id) { const c = Chart.getChart(id); if (c) c.destroy(); }
+
+function renderTimeSeriesCharts() {
+  const labels = dailyData.map(d => d.date);
+  // One reduce instead of four — sums.input/output/cacheCreate/cacheRead.
+  const sums = sumDaily(dailyData);
+
+  // Theme-friendly border for doughnut segments. Falls back to slate.
+  const segBorder = getComputedStyle(document.documentElement)
+    .getPropertyValue('--card').trim() || '#1a2028';
+
+  makeChart('costChart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'CLI',    data: dailyData.map(d => d.cliCost),    backgroundColor: '#60a5fa', borderRadius: 4, stack: 'cost' },
+        { label: 'Cowork', data: dailyData.map(d => d.coworkCost), backgroundColor: '#f472b6', borderRadius: 4, stack: 'cost' },
+      ]
+    },
+    options: { ...chartOpts,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${Currency.format(ctx.parsed.y)}` } }
+      },
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { callback: v => Currency.format(v) } } }
+    }
+  });
+
+  makeChart('compositionChart', {
+    type: 'doughnut',
+    data: {
+      labels: ['Cache Read', 'Cache Create', 'Output', 'Input'],
+      datasets: [{
+        data: [sums.cacheRead, sums.cacheCreate, sums.output, sums.input],
+        backgroundColor: ['#4ade80', '#60a5fa', '#fbbf24', '#a78bfa'],
+        borderColor: segBorder, borderWidth: 2,
+      }]
+    },
+    options: { ...chartOpts,
+      plugins: { legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } } }
+    }
+  });
+
+  makeChart('tokensChart', {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Cache Read',   data: dailyData.map(d => d.cacheRead),   backgroundColor: '#4ade80' },
+      { label: 'Cache Create', data: dailyData.map(d => d.cacheCreate), backgroundColor: '#60a5fa' },
+      { label: 'Output',       data: dailyData.map(d => d.output),      backgroundColor: '#fbbf24' },
+      { label: 'Input',        data: dailyData.map(d => d.input),       backgroundColor: '#a78bfa' },
+    ]},
+    options: { ...chartOpts,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+      scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: v => (v / 1e6).toFixed(1) + 'M' } } }
+    }
+  });
+
+  makeChart('hitRatioChart', {
+    type: 'line',
+    data: { labels, datasets: [{
+      label: 'Cache Hit Ratio',
+      data: dailyData.map(d => {
+        const denom = d.cacheRead + d.cacheCreate;
+        return denom > 0 ? +(d.cacheRead / denom * 100).toFixed(2) : 0;
+      }),
+      borderColor: '#4ade80', backgroundColor: 'rgba(74, 222, 128, 0.15)',
+      fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#4ade80',
+    }]},
+    options: { ...chartOpts,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } } }
+    }
+  });
+}
+renderTimeSeriesCharts();
+
+function renderKPIs() {
+  const grid = document.getElementById('kpiGrid');
+  if (!grid) return;
+  const t = sumDaily(dailyData);   // single pass, all sums + peak
+  const sums = {
+    cost: t.cost, cli: t.cli, cw: t.cowork, tokens: t.total,
+    cr: t.cacheRead, cw2: t.cacheCreate, out: t.output, inp: t.input,
+  };
+  const days = t.days || 1;
+  const peak = t.peak;
+  const hitRatio = t.hitRatio * 100;
+  const fmtTk = n => n >= 1e6 ? (n/1e6).toFixed(2) + 'M' : n >= 1e3 ? (n/1e3).toFixed(1) + 'K' : (n||0).toString();
+  grid.innerHTML = `
+    <div class="card kpi"><div class="label">Total Cost</div>
+      <div class="value">${fmtMoney(sums.cost)}</div>
+      <div class="sub">${fmtMoney(sums.cli)} CLI + ${fmtMoney(sums.cw)} Cowork</div></div>
+    <div class="card kpi"><div class="label">Total Tokens</div>
+      <div class="value">${fmtTk(sums.tokens)}</div>
+      <div class="sub">${days} day${days===1?'':'s'} in range</div></div>
+    <div class="card kpi"><div class="label">Cache Hit Ratio</div>
+      <div class="value" style="color: var(--green);">${hitRatio.toFixed(2)}%</div>
+      <div class="ratio-bar"><div style="width: ${hitRatio}%"></div></div>
+      <div class="sub">cache_read / (cache_read + cache_create)</div></div>
+    <div class="card kpi"><div class="label">Cache Read Tokens</div>
+      <div class="value">${fmtTk(sums.cr)}</div>
+      <div class="sub">vs ${fmtTk(sums.cw2)} cache writes</div></div>
+    <div class="card kpi"><div class="label">Output Tokens</div>
+      <div class="value">${fmtTk(sums.out)}</div>
+      <div class="sub">vs ${fmtTk(sums.inp)} input</div></div>
+    <div class="card kpi"><div class="label">Avg Cost / Day</div>
+      <div class="value">${fmtMoney(sums.cost/days)}</div>
+      <div class="sub">${peak ? 'Peak: ' + fmtMoney(peak.cost) + ' on ' + peak.date : '—'}</div></div>
+  `;
+}
+renderKPIs();
+
+// Wire up date filter (anchors presets to latest data point).
+const latestDate = ALL_DAILY.length ? ALL_DAILY[ALL_DAILY.length - 1].date : null;
+DateFilter.mount("dateFilter", {
+  storageKey: "ccusage.dashboard.range",
+  defaultKey: "all",
+  referenceDate: latestDate,
+  extras: `
+    <span class="df-label">Machine</span>
+    <select id="dashMachine"><option value="all">All machines</option></select>
+    <span class="df-label">Source</span>
+    <select id="dashSource">
+      <option value="all">All</option>
+      <option value="cli">CLI only</option>
+      <option value="cowork">Cowork only</option>
+    </select>
+    <span class="df-label">Project</span>
+    <select id="dashProject"><option value="all">All projects</option></select>
+  `,
+  onChange: (key, startISO, endISO) => {
+    LAST_DATE_RANGE = { startISO, endISO };
+    applyAllFilters();
+  },
+});
+
+// Wire the extra selects (project list populates lazily once insights is loaded
+// and reacts to the source filter so you only see projects with activity in
+// the selected source).
+const machineSel = document.getElementById("dashMachine");
+const sourceSel  = document.getElementById("dashSource");
+const projectSel = document.getElementById("dashProject");
+
+// --- Machine filter loader ----------------------------------------------
+// Pull every machine snapshot via the manifest, reshape into daily rows,
+// stash in MACHINES_DAILY, and rebuild the machine dropdown. Default
+// view ("all machines") is the per-date sum across hosts.
+function rebuildMachineOptions() {
+  const previous = machineSel.value;
+  machineSel.innerHTML = '<option value="all">All machines</option>';
+  if (!MACHINES_DAILY) return;
+  const hosts = Object.keys(MACHINES_DAILY).sort();
+  for (const h of hosts) {
+    const total = MACHINES_DAILY[h].reduce((s, r) => s + (r.cost || 0), 0);
+    const opt = document.createElement("option");
+    opt.value = h;
+    opt.textContent = `${h} (${Currency.format(total, { decimals: 0 })})`;
+    machineSel.appendChild(opt);
+  }
+  const stillThere = Array.from(machineSel.options).some(o => o.value === previous);
+  machineSel.value = stillThere ? previous : "all";
+  if (!stillThere) CURRENT_MACHINE = "all";
+}
+
+function rebuildAllDaily() {
+  if (!MACHINES_DAILY || Object.keys(MACHINES_DAILY).length === 0) {
+    ALL_DAILY = LOCAL_DAILY.slice();
+    return;
+  }
+  if (CURRENT_MACHINE === "all") {
+    ALL_DAILY = mergeMachines(MACHINES_DAILY);
+  } else {
+    ALL_DAILY = (MACHINES_DAILY[CURRENT_MACHINE] || []).slice();
+  }
+}
+
+// Load all_machines.js — a single bundled shim with every host's daily[].
+// Browsers block fetch under file:// so we use a script tag (same pattern as
+// daily_merged.js / hourly_merged.js). On success window.ALL_MACHINES is
+// {host: {platform, lastUpdated, totals, daily: [...]}}.
+function loadAllMachineSnapshots() {
+  function consume() {
+    const am = window.ALL_MACHINES;
+    if (!am || typeof am !== "object" || !Object.keys(am).length) return;
+    const out = {};
+    for (const [host, snap] of Object.entries(am)) {
+      out[host] = reshapeMachine(snap);
+    }
+    if (!Object.keys(out).length) return;
+    MACHINES_DAILY = out;
+    rebuildMachineOptions();
+    rebuildAllDaily();
+    applyAllFilters();  // re-render with cross-machine totals
+  }
+  if (window.ALL_MACHINES) { consume(); return; }
+  const s = document.createElement("script");
+  s.src = "machines/all_machines.js"; s.async = true;
+  s.onload  = consume;
+  s.onerror = () => s.remove();
+  document.head.appendChild(s);
+}
+loadAllMachineSnapshots();
+
+// Aggregated per-project totals split by source. Built once from insights.dailyTrend.
+let PROJECT_TOTALS_BY_SOURCE = []; // [{name, total, cli, cowork}, ...] sorted by total desc
+
+function rebuildProjectOptions() {
+  const filtered = PROJECT_TOTALS_BY_SOURCE.filter(p => {
+    if (CURRENT_SOURCE === "cli")    return p.cli    > 0;
+    if (CURRENT_SOURCE === "cowork") return p.cowork > 0;
+    return p.total > 0;
+  });
+  const previousValue = projectSel.value;
+  projectSel.innerHTML = '<option value="all">All projects</option>';
+  for (const p of filtered) {
+    const cost = CURRENT_SOURCE === "cli" ? p.cli
+              : CURRENT_SOURCE === "cowork" ? p.cowork
+              : p.total;
+    const opt = document.createElement("option");
+    opt.value = p.name;
+    const wtBadge = p.worktreeCount > 0 ? ` +${p.worktreeCount}wt` : "";
+    opt.textContent = `${p.name} (${Currency.format(cost, { decimals: 0 })}${wtBadge})`;
+    projectSel.appendChild(opt);
+  }
+  // Keep the previous selection if it's still in the list; otherwise reset.
+  const stillThere = Array.from(projectSel.options).some(o => o.value === previousValue);
+  projectSel.value = stillThere ? previousValue : "all";
+  if (!stillThere && CURRENT_PROJECT !== "all") {
+    CURRENT_PROJECT = "all";
+  }
+}
+
+machineSel.addEventListener("change", () => {
+  CURRENT_MACHINE = machineSel.value;
+  rebuildAllDaily();
+  applyAllFilters();
+});
+sourceSel.addEventListener("change", () => {
+  CURRENT_SOURCE = sourceSel.value;
+  rebuildProjectOptions();
+  applyAllFilters();
+});
+projectSel.addEventListener("change", () => {
+  CURRENT_PROJECT = projectSel.value;
+  applyAllFilters();
+});
+
+loadInsightsForFilter().then(ins => {
+  if (!ins) return;
+  // Aggregate per-project totals scaled to ccusage's day totals (same
+  // reconciliation as computeFilteredDaily) so the dropdown labels never
+  // show a project bigger than the dashboard's TOTAL COST.
+  const allByDate = new Map(ALL_DAILY.map(d => [d.date, d]));
+  const agg = new Map();
+  for (const d of (ins.dailyTrend || [])) {
+    const ccDay = allByDate.get(d.date);
+    if (!ccDay) continue;
+    const dayCli    = (d.bySource || {}).cli    || 0;
+    const dayCowork = (d.bySource || {}).cowork || 0;
+    const dayTotal  = dayCli + dayCowork || 0;
+    if (dayTotal <= 0) continue;
+    const projects = d.byProject || {};
+    const projDetail = d.projectsDetail || {};
+    for (const [name, cost] of Object.entries(projects)) {
+      const m = WT_RE.exec(name);
+      const key = m ? m[1] : name;  // roll worktrees up to parent
+      // Scale insights cost into ccusage cost basis for this day.
+      const scaledTotal = (ccDay.cost || 0) * (cost / dayTotal);
+      let cliShareNum, coworkShareNum;
+      const pd = projDetail[name];
+      if (pd && pd.bySource) {
+        cliShareNum    = pd.bySource.cli    || 0;
+        coworkShareNum = pd.bySource.cowork || 0;
+      } else {
+        cliShareNum    = cost * dayCli    / dayTotal;
+        coworkShareNum = cost * dayCowork / dayTotal;
+      }
+      const scaledCli    = dayCli    > 0 ? (ccDay.cliCost    || 0) * (cliShareNum    / dayCli   ) : 0;
+      const scaledCowork = dayCowork > 0 ? (ccDay.coworkCost || 0) * (coworkShareNum / dayCowork) : 0;
+
+      const cur = agg.get(key) || { name: key, total: 0, cli: 0, cowork: 0, worktreeCount: 0 };
+      cur.total  += scaledTotal;
+      cur.cli    += scaledCli;
+      cur.cowork += scaledCowork;
+      if (m) cur.worktreeCount += 1;
+      agg.set(key, cur);
+    }
+  }
+  PROJECT_TOTALS_BY_SOURCE = Array.from(agg.values()).sort((a, b) => b.total - a.total);
+  rebuildProjectOptions();
+});
+
+// Re-render the project dropdown labels when currency changes so the
+// per-project cost shown in each option follows USD/EUR.
+document.addEventListener("currencychange", () => {
+  if (PROJECT_TOTALS_BY_SOURCE.length) rebuildProjectOptions();
+});
+
+// Re-render money-bearing tables/KPIs when the user toggles USD/EUR.
+document.addEventListener("currencychange", applyAllFilters);
+document.addEventListener("planchange",     applyAllFilters);
+document.addEventListener("tzchange",       applyAllFilters);
+
+// Cost by model — reacts to date filter via insights.dailyTrend.byModel.
+// Project filter intentionally ignored here (a "by-model" cut by-project
+// is a different visualization). Machine filter likewise ignored — insights
+// is single-machine. Add a data-source caption to make the scope explicit.
+function renderModelChart() {
+  let labels = Object.keys(modelTotals);
+  let data   = Object.values(modelTotals).map(m => m.cost);
+  let scope  = "all-time, this machine";
+
+  if (window.INSIGHTS && Array.isArray(window.INSIGHTS.dailyTrend)) {
+    const inDate = (date) => DateFilter.inRange(date,
+                                                LAST_DATE_RANGE.startISO,
+                                                LAST_DATE_RANGE.endISO);
+    const agg = new Map();
+    let anyMatch = false;
+    for (const day of window.INSIGHTS.dailyTrend) {
+      if (!inDate(day.date)) continue;
+      anyMatch = true;
+      for (const [model, cost] of Object.entries(day.byModel || {})) {
+        const short = model.replace("claude-", "").replace(/-\d{8}$/, "");
+        agg.set(short, (agg.get(short) || 0) + (cost || 0));
+      }
+    }
+    if (anyMatch) {
+      const entries = [...agg.entries()].sort((a, b) => b[1] - a[1]);
+      labels = entries.map(e => e[0]);
+      data   = entries.map(e => +e[1].toFixed(4));
+      scope  = (LAST_DATE_RANGE.startISO && LAST_DATE_RANGE.endISO)
+        ? `${LAST_DATE_RANGE.startISO} → ${LAST_DATE_RANGE.endISO}, this machine`
+        : "all-time, this machine";
+    }
+  }
+
+  // Update / set caption
+  let cap = document.getElementById("modelChartCaption");
+  if (!cap) {
+    cap = document.createElement("div");
+    cap.id = "modelChartCaption";
+    cap.style.cssText = "color: var(--muted); font-size: 11px; margin-top: 4px;";
+    const card = document.getElementById("modelChart").closest(".card");
+    if (card) card.appendChild(cap);
+  }
+  cap.textContent = `Scope: ${scope}`;
+
+  makeChart('modelChart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Cost',
+        data,
+        // Shared palette from util.js so chart colours stay consistent
+        // with insights.html and projects.html.
+        backgroundColor: (U && U.PALETTE) || ['#a78bfa', '#d97757', '#60a5fa', '#fbbf24', '#f472b6', '#4ade80'],
+        borderRadius: 4,
+      }]
+    },
+    options: { ...chartOpts,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => Currency.format(ctx.parsed.x) } }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { callback: v => Currency.format(v) } }
+      }
+    }
+  });
+}
+renderModelChart();
+
+// Per-model pricing table
+const mpBody = document.getElementById('modelPricingBody');
+const mpFoot = document.getElementById('modelPricingFoot');
+const totals = { input: 0, output: 0, cw: 0, cr: 0, std: 0, batch: 0, nocache: 0, saved: 0 };
+modelPricing.forEach(p => {
+  const d = pricingDerivedRow(p);
+  totals.input += p.input; totals.output += p.output;
+  totals.cw += p.cacheWrite; totals.cr += p.cacheRead;
+  totals.std += p.standard; totals.batch += d.batch;
+  totals.nocache += d.noCacheCost; totals.saved += d.cacheSaved;
+  const savedPct = (d.cacheSaved / d.noCacheCost * 100).toFixed(1);
+  mpBody.insertAdjacentHTML('beforeend', `
+    <tr>
+      <td><strong>${p.model}</strong></td>
+      <td class="num">${fmt(p.input)}</td>
+      <td class="num">${fmt(p.output)}</td>
+      <td class="num">${fmt(p.cacheWrite)}</td>
+      <td class="num">${fmt(p.cacheRead)}</td>
+      <td class="num">${fmtMoney(p.standard)}</td>
+      <td class="num" style="color: var(--green);">${fmtMoney(d.batch)}</td>
+      <td class="num" style="color: var(--amber);">${fmtMoney(d.noCacheCost)}</td>
+      <td class="num" style="color: var(--green);">−${fmtMoney(d.cacheSaved)} <span style="color: var(--muted); font-size: 11px;">(${savedPct}%)</span></td>
+    </tr>
+  `);
+});
+const totalSavedPct = (totals.saved / totals.nocache * 100).toFixed(1);
+mpFoot.innerHTML = `
+  <tr style="font-weight: 600;">
+    <td>Total</td>
+    <td class="num">${fmt(totals.input)}</td>
+    <td class="num">${fmt(totals.output)}</td>
+    <td class="num">${fmt(totals.cw)}</td>
+    <td class="num">${fmt(totals.cr)}</td>
+    <td class="num">${fmtMoney(totals.std)}</td>
+    <td class="num" style="color: var(--green);">${fmtMoney(totals.batch)}</td>
+    <td class="num" style="color: var(--amber);">${fmtMoney(totals.nocache)}</td>
+    <td class="num" style="color: var(--green);">−${fmtMoney(totals.saved)} <span style="color: var(--muted); font-size: 11px;">(${totalSavedPct}%)</span></td>
+  </tr>
+`;
+
+// Pricing tier comparison chart (grouped bar: standard / batch / no-cache)
+const tierLabels = modelPricing.map(p => p.model);
+const tierStandard = modelPricing.map(p => p.standard);
+const tierBatch = modelPricing.map(p => p.standard * 0.5);
+const tierNoCache = modelPricing.map(p => pricingDerivedRow(p).noCacheCost);
+makeChart('tierChart', {
+  type: 'bar',
+  data: {
+    labels: tierLabels,
+    datasets: [
+      { label: 'No-Cache (hypothetical)', data: tierNoCache,  backgroundColor: '#fbbf24' },
+      { label: 'Standard (actual)',       data: tierStandard, backgroundColor: '#60a5fa' },
+      { label: 'Batch (50% off)',         data: tierBatch,    backgroundColor: '#4ade80' },
+    ]
+  },
+  options: { ...chartOpts,
+    plugins: {
+      legend: { position: 'bottom', labels: { font: { size: 11 } } },
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + Currency.format(ctx.parsed.y) } }
+    },
+    scales: {
+      y: { beginAtZero: true, ticks: { callback: v => Currency.format(v) } }
+    }
+  }
+});
+
+// Caching savings horizontal bar
+makeChart('cacheSavingsChart', {
+  type: 'bar',
+  data: {
+    labels: tierLabels,
+    datasets: [
+      { label: 'Actually paid (Standard)',     data: tierStandard, backgroundColor: '#60a5fa', stack: 's' },
+      { label: 'Saved by prompt caching',      data: modelPricing.map(p => pricingDerivedRow(p).cacheSaved), backgroundColor: '#4ade80', stack: 's' },
+    ]
+  },
+  options: { ...chartOpts,
+    indexAxis: 'y',
+    plugins: {
+      legend: { position: 'bottom', labels: { font: { size: 11 } } },
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + Currency.format(ctx.parsed.x) } }
+    },
+    scales: {
+      x: { stacked: true, ticks: { callback: v => Currency.format(v) } },
+      y: { stacked: true }
+    }
+  }
+});
+
+// CLI vs Cowork donut — live data from dailyData so the date / machine /
+// project / source filters all flow through. Re-rendered on filter change.
+function renderSourceChart() {
+  const t = sumDaily(dailyData);
+  const segBorder = getComputedStyle(document.documentElement)
+    .getPropertyValue('--card').trim() || '#1a2028';
+  makeChart('sourceChart', {
+    type: 'doughnut',
+    data: {
+      labels: ['CLI', 'Cowork (desktop)'],
+      datasets: [{
+        data: [+t.cli.toFixed(4), +t.cowork.toFixed(4)],
+        backgroundColor: ['#60a5fa', '#f472b6'],
+        borderColor: segBorder, borderWidth: 2,
+      }]
+    },
+    options: { ...chartOpts,
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + Currency.format(ctx.parsed) } }
+      }
+    }
+  });
+}
+renderSourceChart();
+</script>
+</body>
+</html>

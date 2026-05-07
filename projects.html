@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Projects — Cost & Activity Roster</title>
+<link rel="stylesheet" href="themes.css" />
+<script src="util.js"></script>
+<script src="theme.js"></script>
+<script src="currency.js"></script>
+<script src="tzmode.js"></script>
+<script src="plan.js"></script>
+<script src="settings.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);  min-height: 100vh;
+  }
+  .wrap { max-width: 1340px; margin: 0 auto; padding: 24px; }
+  h1 { font-size: 24px; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); margin-bottom: 16px; font-size: 14px; }
+  .nav { margin-bottom: 24px; font-size: 13px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .nav a { color: var(--accent); text-decoration: none; margin-right: 16px; }
+  .nav a:hover { text-decoration: underline; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px; margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 14px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 12px; font-weight: 500;
+  }
+  .grid-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .kpi .value { font-size: 22px; font-weight: 600; }
+  .kpi .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .filters { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; font-size: 13px; }
+  .filters select, .filters input[type="text"] {
+    background: var(--bg-soft); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 10px; font-family: inherit; font-size: 12px;
+  }
+  .filters label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left; padding: 10px 8px; font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none;
+  }
+  thead th:hover { color: var(--text); }
+  thead th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody td { padding: 10px 8px; border-bottom: 1px solid var(--border); }
+  tbody tr:hover { background: var(--card-hi); }
+  tbody tr.deadrow { opacity: 0.55; }
+  tbody tr.wtrow td:first-child { padding-left: 32px; color: var(--muted); font-size: 12px; }
+  tbody tr.parentrow td:first-child { font-weight: 600; }
+  .expand-btn {
+    background: transparent; border: none; color: var(--muted); cursor: pointer;
+    padding: 0 6px 0 0; font-family: monospace; font-size: 11px; user-select: none;
+  }
+  .expand-btn:hover { color: var(--accent); }
+  .pill {
+    display: inline-block; padding: 1px 6px; border-radius: 8px;
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+  }
+  .pill-cli    { background: var(--pill-cli-bg); color: var(--pill-cli-fg); }
+  .pill-cowork { background: var(--pill-cowork-bg); color: var(--pill-cowork-fg); }
+  .pill-both   { background: rgba(167, 139, 250, 0.18); color: var(--purple); }
+  .pill-dead   { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+  .pill-wt     { background: rgba(96, 165, 250, 0.12); color: var(--blue); margin-left: 6px; }
+
+  .bar-cell { display: flex; align-items: center; gap: 6px; }
+  .bar { width: 80px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--accent); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+  <div class="nav">
+    <a href="index.html" style="font-weight: 600;">← Home</a>
+    <a href="explore.html">Explore</a>
+    <a href="timeline.html">Timeline</a>
+    <a href="projects.html" style="color: var(--text);">Projects</a>
+    <a href="improvements.html">Improvements</a>
+    <a href="plan.html">Plan</a>
+    <a href="tour.html">Story</a>
+    <a href="glossary.html">Glossary</a>
+    <span style="margin-left:auto; display:inline-flex; gap:8px; align-items:center;">
+      <span id="themeToggle"></span>
+      <span id="settings"></span>
+    </span>
+  </div>
+  <script>
+    ThemeToggle.mount("themeToggle");
+    Settings.mount("settings");
+  </script>
+  <h1>Projects — Cost & Activity Roster</h1>
+  <p class="subtitle" id="subtitle">Loading…</p>
+
+  <div class="grid-kpis" id="kpis"></div>
+
+  <div class="card">
+    <h2>Project Roster</h2>
+    <div class="filters">
+      <label>Source
+        <select id="srcFilter">
+          <option value="all">All</option>
+          <option value="cli">CLI only</option>
+          <option value="cowork">Cowork only</option>
+        </select>
+      </label>
+      <label>Search
+        <input type="text" id="search" placeholder="filter by name…" />
+      </label>
+      <label><input type="checkbox" id="hideDead" checked /> Hide dead-ends (&lt;$1 or &gt;30 days idle)</label>
+      <label><input type="checkbox" id="expandWt" /> Expand worktrees</label>
+      <span style="margin-left:auto; color: var(--muted); font-size:12px;" id="rowcount"></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th data-sort="name">Project</th>
+          <th data-sort="source">Source</th>
+          <th data-sort="firstDate">First seen</th>
+          <th data-sort="lastDate">Last seen</th>
+          <th data-sort="days" class="num">Days</th>
+          <th data-sort="turns" class="num">Turns</th>
+          <th data-sort="cli" class="num">CLI</th>
+          <th data-sort="cowork" class="num">Cowork</th>
+          <th data-sort="cost" class="num">Total</th>
+          <th class="num">Share</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p style="color: var(--muted); font-size: 11px; margin-top: 12px;">
+      Worktrees (Git worktrees Claude Code creates per session) are rolled up under their parent project.
+      Toggle <em>Expand worktrees</em> to see each branch separately.
+      Source split uses <code>projectsDetail.bySource</code> when present, falling back to the day-level
+      CLI/Cowork ratio for older entries.
+    </p>
+  </div>
+
+<script>
+const fmtMoney = v => Currency.format(v);
+const pct = (n, d) => d > 0 ? ((n / d) * 100).toFixed(1) + "%" : "0.0%";
+
+let RAW = null;
+let SORT_KEY = "cost";
+let SORT_DIR = -1;  // descending
+
+function loadInsights() {
+  if (window.INSIGHTS) { onLoaded(window.INSIGHTS); return; }
+  const s = document.createElement("script");
+  s.src = "insights_data.js";
+  s.onload  = () => window.INSIGHTS ? onLoaded(window.INSIGHTS) : fallback();
+  s.onerror = fallback;
+  document.head.appendChild(s);
+}
+function fallback() {
+  fetch("insights.json").then(r => r.json()).then(onLoaded).catch(e => {
+    document.getElementById("subtitle").textContent =
+      "Failed to load insights data — run build_insights.py first.";
+    console.error(e);
+  });
+}
+function onLoaded(d) { RAW = d; render(); }
+
+// Aggregate per-project stats from dailyTrend.
+function aggregate() {
+  const stats = new Map();
+  for (const day of (RAW.dailyTrend || [])) {
+    const detail = day.projectsDetail || {};
+    const dayCli    = (day.bySource || {}).cli    || 0;
+    const dayCowork = (day.bySource || {}).cowork || 0;
+    const dayTot    = dayCli + dayCowork || 1;
+    for (const [name, cost] of Object.entries(day.byProject || {})) {
+      let s = stats.get(name);
+      if (!s) {
+        s = { name, cost: 0, cli: 0, cowork: 0, turns: 0, days: new Set(), firstDate: null, lastDate: null };
+        stats.set(name, s);
+      }
+      s.cost += cost;
+      s.days.add(day.date);
+      if (s.firstDate === null || day.date < s.firstDate) s.firstDate = day.date;
+      if (s.lastDate  === null || day.date > s.lastDate)  s.lastDate  = day.date;
+      const pd = detail[name];
+      if (pd && pd.bySource) {
+        s.cli    += pd.bySource.cli    || 0;
+        s.cowork += pd.bySource.cowork || 0;
+      } else {
+        s.cli    += cost * dayCli    / dayTot;
+        s.cowork += cost * dayCowork / dayTot;
+      }
+      if (pd && pd.turns) s.turns += pd.turns;
+    }
+  }
+  // Detect worktrees and group under parent.
+  const WT_RE = /^(.*?) \(wt: ([^)]+)\)$/;
+  const parents = new Map();   // parentName -> rolled-up stats
+  const worktrees = new Map(); // parentName -> array of {branch, ...stats}
+  const standalone = [];
+  for (const s of stats.values()) {
+    const m = WT_RE.exec(s.name);
+    if (m) {
+      const parentName = m[1];
+      const branch = m[2];
+      if (!worktrees.has(parentName)) worktrees.set(parentName, []);
+      worktrees.get(parentName).push({ ...s, branch, _isWt: true });
+      // Roll up into parent
+      let p = parents.get(parentName);
+      if (!p) {
+        p = { name: parentName, cost: 0, cli: 0, cowork: 0, turns: 0, days: new Set(), firstDate: null, lastDate: null, _hasWt: true, _wtCount: 0 };
+        parents.set(parentName, p);
+      }
+      p.cost += s.cost; p.cli += s.cli; p.cowork += s.cowork; p.turns += s.turns;
+      for (const d of s.days) p.days.add(d);
+      if (p.firstDate === null || s.firstDate < p.firstDate) p.firstDate = s.firstDate;
+      if (p.lastDate  === null || s.lastDate  > p.lastDate)  p.lastDate  = s.lastDate;
+      p._wtCount += 1;
+    } else {
+      standalone.push(s);
+    }
+  }
+  // For parents that ALSO have a standalone entry (rare but possible), merge them.
+  const standaloneByName = new Map(standalone.map(s => [s.name, s]));
+  for (const [parentName, p] of parents) {
+    const sa = standaloneByName.get(parentName);
+    if (sa) {
+      p.cost += sa.cost; p.cli += sa.cli; p.cowork += sa.cowork; p.turns += sa.turns;
+      for (const d of sa.days) p.days.add(d);
+      if (p.firstDate === null || sa.firstDate < p.firstDate) p.firstDate = sa.firstDate;
+      if (p.lastDate  === null || sa.lastDate  > p.lastDate)  p.lastDate  = sa.lastDate;
+      p._wtCount += 1;  // parent is itself one entry
+      standaloneByName.delete(parentName);
+    }
+  }
+  // Final ordered list: rolled-up parents + standalones-without-worktrees
+  const top = [...parents.values(), ...standaloneByName.values()];
+  return { top, worktrees };
+}
+
+function classifySource(s) {
+  if (s.cli > 0.01 && s.cowork > 0.01) return "both";
+  if (s.cli > 0.01) return "cli";
+  if (s.cowork > 0.01) return "cowork";
+  return "none";
+}
+
+function isDeadEnd(s, refDate) {
+  if (s.cost < 1) return true;
+  if (!s.lastDate) return false;
+  const last = new Date(s.lastDate + "T00:00:00Z");
+  const cutoff = new Date(refDate);
+  cutoff.setUTCDate(cutoff.getUTCDate() - 30);
+  return last < cutoff;
+}
+
+function row(s, opts) {
+  const src = classifySource(s);
+  const srcPill = src === "both" ? '<span class="pill pill-both">CLI + Cowork</span>'
+              : src === "cli"  ? '<span class="pill pill-cli">CLI</span>'
+              : src === "cowork" ? '<span class="pill pill-cowork">Cowork</span>'
+              : '<span class="pill" style="background:var(--border); color:var(--muted);">—</span>';
+  const sharePct = opts.maxCost > 0 ? (s.cost / opts.maxCost) : 0;
+  const dead = opts.dead ? ' deadrow' : '';
+  const cls = (opts.isWt ? 'wtrow' : (s._hasWt ? 'parentrow' : '')) + dead;
+  const wtIndicator = s._hasWt && !opts.isWt
+    ? `<span class="pill pill-wt">+${s._wtCount} wt</span>` : '';
+  const expand = s._hasWt && !opts.isWt
+    ? `<button class="expand-btn" data-expand="${U.escAttr(s.name)}" aria-label="Expand worktrees">${opts.expanded ? '▾' : '▸'}</button>` : '';
+  const display = opts.isWt ? `wt: ${U.esc(s.branch)}` : U.esc(s.name);
+  return `
+    <tr class="${cls}">
+      <td>${expand}${display}${wtIndicator}${opts.dead ? ' <span class="pill pill-dead">dead</span>' : ''}</td>
+      <td>${srcPill}</td>
+      <td>${U.esc(s.firstDate || "—")}</td>
+      <td>${U.esc(s.lastDate  || "—")}</td>
+      <td class="num">${(s.days instanceof Set) ? s.days.size : (Array.isArray(s.days) ? s.days.length : 0)}</td>
+      <td class="num">${(s.turns || 0).toLocaleString()}</td>
+      <td class="num">${fmtMoney(s.cli)}</td>
+      <td class="num">${fmtMoney(s.cowork)}</td>
+      <td class="num"><strong>${fmtMoney(s.cost)}</strong></td>
+      <td class="num">
+        <div class="bar-cell">
+          <div class="bar"><div class="bar-fill" style="width:${(sharePct*100).toFixed(0)}%"></div></div>
+          <span style="color:var(--muted); font-size:11px;">${(sharePct*100).toFixed(0)}%</span>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function render() {
+  if (!RAW) return;
+  const { top, worktrees } = aggregate();
+  const refDate = (RAW.generatedAt || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
+  const srcMode = document.getElementById("srcFilter").value;
+  const hideDead = document.getElementById("hideDead").checked;
+  const expandAll = document.getElementById("expandWt").checked;
+  const search = (document.getElementById("search").value || "").toLowerCase().trim();
+
+  // Filter
+  let rows = top.filter(s => {
+    if (search && !s.name.toLowerCase().includes(search)) return false;
+    if (srcMode === "cli"    && !(s.cli > 0.01))    return false;
+    if (srcMode === "cowork" && !(s.cowork > 0.01)) return false;
+    if (hideDead && isDeadEnd(s, refDate)) return false;
+    return true;
+  });
+
+  // Sort
+  rows.sort((a, b) => {
+    let av = a[SORT_KEY], bv = b[SORT_KEY];
+    if (SORT_KEY === "days") { av = a.days.size; bv = b.days.size; }
+    if (SORT_KEY === "source") { av = classifySource(a); bv = classifySource(b); }
+    if (av === null || av === undefined) av = "";
+    if (bv === null || bv === undefined) bv = "";
+    if (typeof av === "string") return SORT_DIR * av.localeCompare(bv);
+    return SORT_DIR * (av - bv);
+  });
+
+  const maxCost = rows.reduce((m, s) => Math.max(m, s.cost), 0);
+
+  // KPIs
+  const total   = top.reduce((s, x) => s + x.cost, 0);
+  const totalCli= top.reduce((s, x) => s + x.cli,    0);
+  const totalCw = top.reduce((s, x) => s + x.cowork, 0);
+  const allDead = top.filter(s => isDeadEnd(s, refDate));
+  const wtCount = top.filter(s => s._hasWt).length;
+  document.getElementById("kpis").innerHTML = `
+    <div class="card kpi" style="margin:0;"><div class="label">Projects (rolled up)</div>
+      <div class="value">${top.length}</div>
+      <div class="sub">${wtCount} have worktrees</div></div>
+    <div class="card kpi" style="margin:0;"><div class="label">Total spend</div>
+      <div class="value">${fmtMoney(total)}</div>
+      <div class="sub">${fmtMoney(totalCli)} CLI · ${fmtMoney(totalCw)} Cowork</div></div>
+    <div class="card kpi" style="margin:0;"><div class="label">Dead-ends</div>
+      <div class="value">${allDead.length}</div>
+      <div class="sub">&lt;$1 or &gt;30d idle · ${fmtMoney(allDead.reduce((s,x)=>s+x.cost,0))} total</div></div>
+    <div class="card kpi" style="margin:0;"><div class="label">Date span</div>
+      <div class="value" style="font-size: 14px;">${top.length ? top.reduce((m,s)=> s.firstDate < m ? s.firstDate : m, "9999") : "—"} → ${top.length ? top.reduce((m,s)=> s.lastDate > m ? s.lastDate : m, "0000") : "—"}</div>
+      <div class="sub">first / last activity across all projects</div></div>
+  `;
+
+  // Render rows (with optional expanded worktree subrows)
+  const expandedSet = window.__EXPANDED__ || new Set();
+  if (expandAll) for (const k of worktrees.keys()) expandedSet.add(k);
+  let html = "";
+  for (const s of rows) {
+    const expanded = expandedSet.has(s.name);
+    html += row(s, { maxCost, dead: isDeadEnd(s, refDate), expanded });
+    if (s._hasWt && expanded) {
+      const kids = (worktrees.get(s.name) || []).slice().sort((a, b) => b.cost - a.cost);
+      for (const k of kids) {
+        html += row(k, { maxCost, isWt: true, dead: isDeadEnd(k, refDate) });
+      }
+    }
+  }
+  document.getElementById("rows").innerHTML = html || `<tr><td colspan="10" style="color:var(--muted); padding:24px; text-align:center;">No projects match the filters.</td></tr>`;
+  document.getElementById("rowcount").textContent = `${rows.length} project${rows.length === 1 ? '' : 's'} shown`;
+  document.getElementById("subtitle").textContent =
+    `${top.length} projects total · ${fmtMoney(total)} total spend · range ${refDate}`;
+
+  // Expand button handlers
+  document.querySelectorAll("[data-expand]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const name = btn.dataset.expand;
+      if (!window.__EXPANDED__) window.__EXPANDED__ = new Set();
+      if (window.__EXPANDED__.has(name)) window.__EXPANDED__.delete(name);
+      else window.__EXPANDED__.add(name);
+      render();
+    });
+  });
+}
+
+// Wire controls
+document.getElementById("srcFilter").addEventListener("change", render);
+document.getElementById("hideDead").addEventListener("change", render);
+document.getElementById("expandWt").addEventListener("change", () => {
+  if (!document.getElementById("expandWt").checked) window.__EXPANDED__ = new Set();
+  render();
+});
+document.getElementById("search").addEventListener("input", render);
+document.querySelectorAll("thead th[data-sort]").forEach(th => {
+  th.addEventListener("click", () => {
+    const k = th.dataset.sort;
+    if (SORT_KEY === k) SORT_DIR = -SORT_DIR;
+    else { SORT_KEY = k; SORT_DIR = (k === "name" || k === "firstDate" || k === "lastDate" || k === "source") ? 1 : -1; }
+    render();
+  });
+});
+document.addEventListener("currencychange", render);
+document.addEventListener("themechange",    render);
+document.addEventListener("tzchange",       render);
+
+loadInsights();
+</script>
+  </div>
+</body>
+</html>

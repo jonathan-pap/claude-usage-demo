@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Glossary — Terms & Formulas</title>
+<link rel="stylesheet" href="themes.css" />
+<script src="util.js"></script>
+<script src="theme.js"></script>
+<script src="currency.js"></script>
+<script src="tzmode.js"></script>
+<script src="plan.js"></script>
+<script src="settings.js"></script>
+
+<!-- KaTeX for formula rendering. Loaded async after first paint. -->
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+      integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+"
+      crossorigin="anonymous" referrerpolicy="no-referrer" />
+<script defer
+        src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+        integrity="sha384-7zkQWkzuo3B5mTepMUcHkMB5jZaolc2xDwL6VFqjFALcbeS9Ggm/Yr2r3Dy4lfFg"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script defer
+        src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        integrity="sha384-43gviWU0YVjaDtb/GhzOouOXtZMP/7XUzwPTstBeZFe/+rCMvRwr4yROQP43s0Xk"
+        crossorigin="anonymous" referrerpolicy="no-referrer"
+        onload="renderMathInElement(document.body, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$',  right: '$',  display: false},
+            {left: '\\\\(', right: '\\\\)', display: false},
+            {left: '\\\\[', right: '\\\\]', display: true}
+          ],
+          throwOnError: false
+        });"></script>
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1340px; margin: 0 auto; padding: 24px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); margin-bottom: 24px; font-size: 14px; }
+  .nav { margin-bottom: 24px; font-size: 13px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .nav a { color: var(--accent); text-decoration: none; }
+  .nav a:hover { text-decoration: underline; }
+
+  .toc {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px; margin-bottom: 32px;
+  }
+  .toc h2 { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .toc ul { list-style: none; columns: 2; column-gap: 24px; }
+  @media (max-width: 700px) { .toc ul { columns: 1; } }
+  .toc li { padding: 3px 0; }
+  .toc a { color: var(--text); text-decoration: none; font-size: 13px; }
+  .toc a:hover { color: var(--accent); }
+
+  .term {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 22px 26px; margin-bottom: 18px;
+    scroll-margin-top: 24px;
+  }
+  .term h3 {
+    font-size: 18px; margin-bottom: 6px;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .term h3 .tag {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    background: var(--card-hi); color: var(--muted);
+    padding: 2px 8px; border-radius: 999px; letter-spacing: 0.4px;
+  }
+  .term p { margin: 8px 0; color: var(--text); font-size: 14px; }
+  .term .lead { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+  .term .ref { color: var(--muted); font-size: 11px; margin-top: 8px; }
+  .term .ref code {
+    background: var(--card-hi); padding: 2px 6px; border-radius: 4px; font-size: 11px;
+  }
+  .term ul, .term ol { margin: 8px 0 8px 20px; }
+  .term li { margin: 4px 0; font-size: 14px; }
+  .term code { background: var(--card-hi); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+  .formula { padding: 8px 0; }
+  /* KaTeX color tweaks for dark themes */
+  .katex { color: var(--text); }
+  .katex .mord, .katex .mrel, .katex .mbin { color: var(--text); }
+
+  .pill { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+  .pill-cli    { background: var(--pill-cli-bg); color: var(--pill-cli-fg); }
+  .pill-cowork { background: var(--pill-cowork-bg); color: var(--pill-cowork-fg); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <a href="index.html" style="font-weight: 600;">← Home</a>
+      <a href="explore.html">Explore</a>
+      <a href="timeline.html">Timeline</a>
+      <a href="projects.html">Projects</a>
+    <a href="improvements.html">Improvements</a>
+      <a href="plan.html">Plan</a>
+      <a href="tour.html">Story</a>
+      <a href="glossary.html" style="color: var(--text);">Glossary</a>
+      <span style="margin-left:auto; display:inline-flex; gap:8px; align-items:center;">
+        <span id="themeToggle"></span>
+        <span id="settings"></span>
+      </span>
+    </div>
+    <script>
+      ThemeToggle.mount("themeToggle");
+      Settings.mount("settings");
+    </script>
+
+    <h1>Glossary &amp; Formulas</h1>
+    <p class="subtitle">Concepts, data sources, and the math behind every number on every page.</p>
+
+    <div class="toc">
+      <h2>Contents</h2>
+      <ul>
+        <li><a href="#turn">Turn (and conversation)</a></li>
+        <li><a href="#api-value">API value (cost basis)</a></li>
+        <li><a href="#cli-cowork">CLI vs Cowork (sources)</a></li>
+        <li><a href="#worktree">Worktree (Claude Code)</a></li>
+        <li><a href="#cache-hit">Cache hit ratio</a></li>
+        <li><a href="#no-cache">No-cache hypothetical</a></li>
+        <li><a href="#monthly-projection">Monthly projection</a></li>
+        <li><a href="#plan-utilization">Plan utilization</a></li>
+        <li><a href="#tool-categories">Tool categories</a></li>
+        <li><a href="#reconciliation">Insights vs ccusage reconciliation</a></li>
+        <li><a href="#multi-machine">Multi-machine merge</a></li>
+        <li><a href="#timestamps">Timestamps &amp; timezones</a></li>
+        <li><a href="#turn-log-cap">Turn log cap</a></li>
+        <li><a href="#dead-end">Dead-end project</a></li>
+        <li><a href="#peak-cell">Day × Hour peak cell</a></li>
+      </ul>
+    </div>
+
+    <div class="term" id="turn">
+      <h3>Turn (and conversation) <span class="tag">unit of work</span></h3>
+      <p class="lead">The atomic billing unit and the building block of every cost calculation.</p>
+      <p>
+        A <strong>turn</strong> is one user-prompt → assistant-response exchange. In
+        Claude Code's JSONL transcript, each turn is a single record carrying:
+      </p>
+      <ul>
+        <li>a <code>timestamp</code> (UTC, when the assistant replied),</li>
+        <li>the <code>model</code> that answered,</li>
+        <li>a <code>usage</code> block — <code>input_tokens</code>, <code>output_tokens</code>, <code>cache_creation_input_tokens</code>, <code>cache_read_input_tokens</code>,</li>
+        <li>and any tools the assistant called during its reply.</li>
+      </ul>
+      <p>
+        Cost is computed per turn (see <a href="#api-value">API value</a>). When you see
+        "39,227 turns" on the Insights page, that's the total count of those JSONL records
+        across every parsed session.
+      </p>
+      <p>
+        A <strong>conversation</strong> (or <strong>session</strong>) is a single
+        <code>sessionId</code> — i.e. one continuous chat thread Claude Code kept alive.
+        One conversation contains many turns: opening the session is turn 1, every reply
+        after a follow-up prompt is another turn. A long-running CLI session in a
+        complex project can rack up hundreds or thousands of turns; a cowork "ask once"
+        session might be just two or three.
+      </p>
+      <p>The Conversations table on the Insights page summarises each session:</p>
+      <ul>
+        <li><strong>Turns</strong> — the count for that one sessionId.</li>
+        <li><strong>Avg context / turn</strong> — average prompt size:
+          <span class="formula">$\dfrac{\sum_t (\text{input}_t + \text{cache\_read}_t)}{\text{turns}}$</span>.
+          A long conversation with low cache hit ratio will inflate this fast.</li>
+        <li><strong>Duration</strong> — wall-clock time between the first and last
+          assistant message of the session.</li>
+      </ul>
+      <p class="ref">See also <a href="#turn-log-cap">Turn log cap</a> for how many turns the timeline activity feed retains.</p>
+    </div>
+
+    <div class="term" id="api-value">
+      <h3>API value <span class="tag">cost basis</span></h3>
+      <p class="lead">What every dollar/euro figure on the dashboard represents.</p>
+      <p>
+        Cost is computed at the <strong>pay-as-you-go API</strong> rate for each model,
+        regardless of what subscription plan you're on. Even when you've paid a flat
+        $100/mo for Max 5×, the dashboard shows the API cost <em>equivalent</em> of your
+        usage so you can compare value-received against fee-paid.
+      </p>
+      <p>The cost of a single turn is:</p>
+      <div class="formula">
+        $$ \text{cost}_\text{turn} = \frac{\text{in} \cdot p_\text{in} + \text{out} \cdot p_\text{out} + \text{cw} \cdot p_\text{cw} + \text{cr} \cdot p_\text{cr}}{10^6} $$
+      </div>
+      <p>where <em>in/out/cw/cr</em> are token counts and the per-million rates come from each model's pricing card. Two pricing pipelines exist:</p>
+      <ul>
+        <li><code>ccusage</code> CLI (used by <code>usage_history.json</code>) — Anthropic's own tool, the source of truth for KPIs.</li>
+        <li><code>build_insights.py</code> (used by <code>insights.json</code>) — our own pricing tables, used for per-project / per-tool / per-MCP attribution. Per-token rates differ slightly from <code>ccusage</code>.</li>
+      </ul>
+      <p class="ref">See <a href="#reconciliation">Reconciliation</a> for how the two are aligned.</p>
+    </div>
+
+    <div class="term" id="cli-cowork">
+      <h3>CLI vs Cowork <span class="tag">sources</span></h3>
+      <p>Two distinct ways Claude Code writes JSONL transcripts:</p>
+      <ul>
+        <li><span class="pill pill-cli">CLI</span> Sessions started from a terminal via the <code>claude</code> command. Stored under <code>~/.claude/projects/&lt;cwd-slug&gt;/</code>.</li>
+        <li><span class="pill pill-cowork">Cowork</span> Sessions started inside Claude Desktop ("local agent mode"). Stored under <code>%APPDATA%/Claude/local-agent-mode-sessions/&lt;tenant&gt;/&lt;workspace&gt;/local_&lt;sessionId&gt;/.claude/projects/</code>.</li>
+      </ul>
+      <p>Both produce identical JSONL turn records — the dashboard differentiates them only because the directory structure tells us which entrypoint launched the session.</p>
+    </div>
+
+    <div class="term" id="worktree">
+      <h3>Worktree <span class="tag">project structure</span></h3>
+      <p>
+        Claude Code can attach a session to a <a href="https://git-scm.com/docs/git-worktree" target="_blank" style="color: var(--accent);">git worktree</a> —
+        a side-checkout of the same repo on a different branch under <code>.claude/worktrees/&lt;random-name&gt;/</code>.
+        Each worktree session writes its own JSONL stream, so <code>build_insights.py</code> sees them as
+        distinct project entries named <code>&lt;parent&gt; (wt: &lt;branch&gt;)</code>.
+      </p>
+      <p>
+        The <a href="projects.html">Projects roster</a> and the dashboard's project filter
+        roll worktrees back up under their parent so a project's true total includes
+        every branch's spend.
+      </p>
+    </div>
+
+    <div class="term" id="cache-hit">
+      <h3>Cache hit ratio <span class="tag">formula</span></h3>
+      <p class="lead">How much of your prompt was reused vs paid full price for.</p>
+      <div class="formula">
+        $$ \text{hit ratio} = \frac{\text{cache\_read}}{\text{cache\_read} + \text{cache\_create}} $$
+      </div>
+      <p>
+        <code>cache_read</code> tokens cost ~10% of input rate. <code>cache_create</code>
+        tokens cost ~125% of input rate (the cost of putting them in the cache). A high
+        ratio means long sessions are reusing context efficiently.
+      </p>
+      <p class="ref">Healthy is &gt;85%. Below 50% suggests the model is rehydrating context from scratch each turn.</p>
+    </div>
+
+    <div class="term" id="no-cache">
+      <h3>No-cache hypothetical <span class="tag">formula</span></h3>
+      <p class="lead">"What would this have cost if prompt caching didn't exist?"</p>
+      <p>
+        Without caching, every <code>cache_read</code> token would be re-billed at the
+        full input rate (since they'd be regular input tokens) and
+        <code>cache_create</code> would never have been a separate line item.
+        The savings are:
+      </p>
+      <div class="formula">
+        $$ \text{saved} \approx \text{cache\_read} \cdot p_\text{in} \cdot 0.9 $$
+      </div>
+      <p>The 0.9 factor is <span style="color: var(--muted);">(input rate − cache_read rate) ÷ input rate ≈ (1 − 0.1)</span>. Reading from cache is 10% of input price; the saving per token is the other 90%.</p>
+      <p class="ref">Used by Chapter 4 of the Story page and the dashboard's "Cost by Model &amp; Pricing Tier" table.</p>
+    </div>
+
+    <div class="term" id="monthly-projection">
+      <h3>Monthly projection <span class="tag">formula</span></h3>
+      <p>Average daily cost extrapolated to a 30.44-day month (the average days/month across a year).</p>
+      <div class="formula">
+        $$ \text{monthly} = \frac{\sum_d \text{cost}_d}{|\text{days}|} \cdot 30.44 $$
+      </div>
+      <p>
+        Span is calendar-day distance between the first and last active day in the
+        selected range, not just the count of active days. So 5 active days inside a
+        20-day calendar window divides by 20, not 5.
+      </p>
+    </div>
+
+    <div class="term" id="plan-utilization">
+      <h3>Plan utilization <span class="tag">formula</span></h3>
+      <p>What share of your subscription's flat fee you're getting in API value.</p>
+      <div class="formula">
+        $$ \text{utilization} = \frac{\text{monthly projection}}{\text{plan monthly fee}} \cdot 100\% $$
+      </div>
+      <ul>
+        <li>&lt;50% — paying for headroom you may not need.</li>
+        <li>50&ndash;100% — comfortable fit.</li>
+        <li>&gt;100% — the subscription is paying off; API would cost more.</li>
+      </ul>
+      <p class="ref">Pay-as-you-go API and Enterprise plans return <code>n/a</code> (no flat fee to compare against).</p>
+    </div>
+
+    <div class="term" id="tool-categories">
+      <h3>Tool categories <span class="tag">classification</span></h3>
+      <p>Every tool invocation is bucketed into one of five categories at parse time:</p>
+      <ul>
+        <li><strong>builtin</strong> — Bash, Edit, Read, Write, Grep, Glob, etc. The Claude Code core tool set.</li>
+        <li><strong>mcp</strong> — anything starting with <code>mcp__&lt;server&gt;__&lt;name&gt;</code>. Server name is extracted as the second segment.</li>
+        <li><strong>plugin</strong> — anything starting with <code>plugin_&lt;name&gt;</code>.</li>
+        <li><strong>subagent</strong> — invocations of the <code>Task</code> tool with a <code>subagent_type</code> argument.</li>
+        <li><strong>unknown</strong> — anything else (rare; usually a typo or third-party shim).</li>
+      </ul>
+      <p>Cost is attributed to the <em>turn</em> that ran the tool, then divided equally among that turn's tool invocations for per-tool aggregations.</p>
+    </div>
+
+    <div class="term" id="reconciliation">
+      <h3>Insights vs ccusage reconciliation <span class="tag">cross-source</span></h3>
+      <p>
+        Two pricing engines, two slightly different totals. <code>ccusage</code>
+        ($A) uses Anthropic's pricing data verbatim. <code>build_insights.py</code>
+        ($B) re-prices from JSONL using static rate tables — typically ~2× higher
+        on cache-heavy workloads.
+      </p>
+      <p>
+        The dashboard shows ccusage totals (KPI authoritative). When the user
+        filters by project, only insights has the per-project breakdown. To keep
+        the filter consistent, we use insights for shares and apply them to the
+        ccusage day-total:
+      </p>
+      <div class="formula">
+        $$ \text{cost}_{\text{proj},d}^{\text{shown}} = \text{cost}_d^{\text{ccusage}} \cdot \frac{\text{cost}_{\text{proj},d}^{\text{insights}}}{\sum_p \text{cost}_{p,d}^{\text{insights}}} $$
+      </div>
+      <p>So a project's filtered total is mathematically guaranteed to be a fraction of the day's true dashboard total.</p>
+    </div>
+
+    <div class="term" id="multi-machine">
+      <h3>Multi-machine merge <span class="tag">cross-machine</span></h3>
+      <p>
+        Each machine writes its own snapshot to <code>machines/&lt;hostname&gt;.json</code>
+        and pushes via git. <code>build_machine_snapshot.py</code> aggregates every
+        peer's snapshot into:
+      </p>
+      <ul>
+        <li><code>machines/manifest.{json,js}</code> — list of machines with summary totals.</li>
+        <li><code>machines/daily_merged.{json,js}</code> — per-date sum across hosts (powers the contribution heatmap).</li>
+        <li><code>machines/hourly_merged.{json,js}</code> — per-hour sum (powers the timeline line chart).</li>
+        <li><code>machines/all_machines.{json,js}</code> — per-host daily[] arrays bundled into one shim (powers the dashboard Machine filter).</li>
+      </ul>
+      <p>
+        All times stay UTC across machines so hour-bucket keys merge cleanly.
+        Display-time conversion (story page tz selector) shifts only what's rendered.
+      </p>
+    </div>
+
+    <div class="term" id="timestamps">
+      <h3>Timestamps &amp; timezones <span class="tag">data</span></h3>
+      <p>
+        JSONL records carry a Z-suffixed UTC timestamp. <code>build_insights.py</code>
+        slices the first 13 chars (<code>YYYY-MM-DDTHH</code>) as the hour-bucket
+        key. Aggregations across machines work because every host writes the same
+        canonical UTC keys.
+      </p>
+      <p>
+        On the page side, <code>tzmode.js</code> uses
+        <code>Intl.DateTimeFormat({ timeZone })</code> — DST is handled by the
+        browser's IANA tz database, so you don't need to track shift transitions
+        manually. UTC remains the default; pick a zone via Settings.
+      </p>
+    </div>
+
+    <div class="term" id="turn-log-cap">
+      <h3>Turn log cap <span class="tag">data</span></h3>
+      <p>
+        The Timeline activity feed reads <code>insights.json</code>'s
+        <code>turnLog[]</code>, which is <strong>capped at 1000 most-recent turns
+        by default</strong>. Heavy users can raise the cap by exporting an env var:
+      </p>
+      <p><code>CCUSAGE_TURN_LOG_CAP=5000 bash update_usage.sh</code></p>
+      <p>The feed title shows <em>"capped at X of N parsed"</em> when truncation occurred so older activity isn't silently dropped.</p>
+    </div>
+
+    <div class="term" id="dead-end">
+      <h3>Dead-end project <span class="tag">filter</span></h3>
+      <p>The Projects roster tags any project as a "dead-end" if either:</p>
+      <ul>
+        <li>Total spend &lt; $1, or</li>
+        <li>Last activity &gt;30 days ago (relative to <code>insights.json</code>'s <code>generatedAt</code>).</li>
+      </ul>
+      <p>
+        Auto-generated cowork session names like
+        <code>affectionate-gifted-ramanujan</code> usually fall into this bucket.
+        Hide-by-default toggle keeps them out of the roster unless you
+        explicitly want to see them.
+      </p>
+    </div>
+
+    <div class="term" id="peak-cell">
+      <h3>Day × Hour peak cell <span class="tag">heatmap</span></h3>
+      <p>
+        Across the selected date range, every turn is bucketed by its UTC weekday
+        (0&hellip;6) × hour-of-day (0&hellip;23). The cell with the highest total
+        cost is the "peak cell". A single integer hour-of-day from this heatmap
+        gets converted to local time via:
+      </p>
+      <div class="formula">
+        $$ \text{local hour} = \text{format}(\text{Date.UTC(today, hour)}, \text{tz}) $$
+      </div>
+      <p>
+        Caveat: a single hour-of-day across many months can't fully represent a
+        DST-spanning year. The "today" reference is used for DST orientation —
+        accurate within a ±1-hour shift if your data crosses a DST transition.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>
