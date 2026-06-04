@@ -40,7 +40,7 @@ Multiple machines each commit their own snapshot. The dashboard merges them clie
 | Tool | Check |
 |---|---|
 | Git | `git --version` |
-| Node.js 18+ | `node --version` |
+| Node.js 22+ (LTS) | `node --version` |
 | Python 3.10+ | `python --version` |
 | Bash | Git Bash on Windows, native on macOS/Linux |
 | Claude Code | Must have session data under `~/.claude/projects/` |
