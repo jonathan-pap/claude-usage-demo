@@ -1,5 +1,10 @@
-# Everything here is intentionally committed for the demo.
-# (In a real deployment these would be gitignored and generated locally.)
+# Data files generated locally by update_usage.sh — NOT committed.
+# The demo data (usage_data.js, insights_data.js, machines/*.json) is
+# intentionally committed so GitHub Pages works out of the box.
+# When you run update_usage.sh your real data will replace it.
+
+usage_history.json
+insights.json
 
 # OS
 .DS_Store
